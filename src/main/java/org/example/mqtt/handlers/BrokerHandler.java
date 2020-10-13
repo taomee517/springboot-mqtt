@@ -151,8 +151,6 @@ public class BrokerHandler extends ChannelDuplexHandler{
                 String clientId = ContextManager.getClientId(ctx.channel());
                 Channel channel = ctx.channel();
                 // 发送遗嘱消息
-                //从channel中获取protocol 实例  todo
-
                 if (mqttService.containsSession(clientId)) {
                     SessionStore sessionStore = mqttService.getSession(clientId);
                     if (sessionStore.getWillMessage() != null) {
@@ -171,7 +169,7 @@ public class BrokerHandler extends ChannelDuplexHandler{
         if (msg instanceof MqttMessage) {
             ctx.writeAndFlush(msg, promise);
         }else {
-            log.warn("不支持的消息类型：{}", msg.getClass());
+            log.warn("非MQTT消息类型：{}", msg.getClass());
             ctx.writeAndFlush(msg, promise);
         }
     }

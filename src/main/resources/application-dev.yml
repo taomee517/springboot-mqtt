@@ -9,6 +9,7 @@ spring:
     config:
       username: admin						# 账号
       password: public						# 密码
+      auth-check-enable: false
       tcp-port: 51100
       ssl-port: 51101
       ws-port: 51102

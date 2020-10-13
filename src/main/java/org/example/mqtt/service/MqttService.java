@@ -32,10 +32,13 @@ public class MqttService implements IMqttService {
 
     @Override
     public boolean checkValid(String user, String pwd) {
-        if(StringUtils.equalsIgnoreCase(user, mqttProperties.getUsername()) && StringUtils.equalsIgnoreCase(pwd, mqttProperties.getPassword())){
+        Boolean authCheckEnable = mqttProperties.getAuthCheckEnable();
+        if (!authCheckEnable){
             return true;
         }
-        return false;
+        String authUser = mqttProperties.getUsername();
+        String authPwd = mqttProperties.getPassword();
+        return StringUtils.equalsIgnoreCase(user, authUser) && StringUtils.equalsIgnoreCase(pwd, authPwd);
     }
 
     @Override

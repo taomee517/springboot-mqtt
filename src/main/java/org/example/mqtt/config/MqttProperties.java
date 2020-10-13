@@ -28,6 +28,7 @@ public class MqttProperties {
 
     private String username;
     private String password;
+    private Boolean authCheckEnable;
 
     private String serverKeyPath;
     private String rootKeyPath;
