@@ -4,6 +4,7 @@ import io.netty.channel.Channel;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.example.mqtt.context.mqtt.*;
 import org.springframework.util.CollectionUtils;
 
@@ -23,6 +24,7 @@ public class ContextManager {
     public static Map<String, ConcurrentHashMap<Integer, DupPubRelMessageStore>> dupPubRelMessageStoreMap = new ConcurrentHashMap<>();
     public static Map<String, RetainMessageStore> retainMessageStoreMap = new ConcurrentHashMap<>();
     public static Map<String, ConcurrentHashMap<String, SubscribeStore>> subscribeNotWildcardMap = new ConcurrentHashMap<>();
+    public static Map<String, ConcurrentHashMap<String, SubscribeStore>> subscribeWildcardMap = new ConcurrentHashMap<>();
 
     public static void putClientId(Channel channel, String clientId){
         channel.attr(MQTT_CLIENT_ID).set(clientId);
@@ -188,6 +190,31 @@ public class ContextManager {
             List<SubscribeStore> list = new ArrayList<SubscribeStore>(collection);
             subscribeStores.addAll(list);
         }
+//        subscribeWildcardMap.keySet().forEach(key -> {
+//            ConcurrentHashMap<String, SubscribeStore> entry = subscribeWildcardMap.get(key);
+//            if (StringUtils.split(key, '/').length >= StringUtils.split(key, '/').length) {
+//                List<String> splitTopics = Arrays.asList(StringUtils.split(key, '/'));
+//                List<String> spliteTopicFilters = Arrays.asList(StringUtils.split(key, '/'));
+//                String newTopicFilter = "";
+//                for (int i = 0; i < spliteTopicFilters.size(); i++) {
+//                    String value = spliteTopicFilters.get(i);
+//                    if (value.equals("+")) {
+//                        newTopicFilter = newTopicFilter + "+/";
+//                    } else if (value.equals("#")) {
+//                        newTopicFilter = newTopicFilter + "#/";
+//                        break;
+//                    } else {
+//                        newTopicFilter = newTopicFilter + splitTopics.get(i) + "/";
+//                    }
+//                }
+//                newTopicFilter = StringUtils.removeEnd(newTopicFilter, "/");
+//                if (key.equals(newTopicFilter)) {
+//                    Collection<SubscribeStore> collection = entry.values();
+//                    List<SubscribeStore> list = new ArrayList<SubscribeStore>(collection);
+//                    subscribeStores.addAll(list);
+//                }
+//            }
+//        });
         return subscribeStores;
     }
 
@@ -212,36 +239,6 @@ public class ContextManager {
         if (retainMessageStoreMap.containsKey(topicFilter)) {
             retainMessageStores.add(retainMessageStoreMap.get(topicFilter));
         }
-//        if (!StrUtil.contains(topicFilter, '#') && !StrUtil.contains(topicFilter, '+')) {
-//            if (retainMessageCache.containsKey(topicFilter)) {
-//                retainMessageStores.add(retainMessageCache.get(topicFilter));
-//            }
-//        } else {
-//            retainMessageCache.forEach(entry -> {
-//                String topic = entry.getKey();
-//                if (StrUtil.split(topic, '/').size() >= StrUtil.split(topicFilter, '/').size()) {
-//                    List<String> splitTopics = StrUtil.split(topic, '/');
-//                    List<String> spliteTopicFilters = StrUtil.split(topicFilter, '/');
-//                    String newTopicFilter = "";
-//                    for (int i = 0; i < spliteTopicFilters.size(); i++) {
-//                        String value = spliteTopicFilters.get(i);
-//                        if (value.equals("+")) {
-//                            newTopicFilter = newTopicFilter + "+/";
-//                        } else if (value.equals("#")) {
-//                            newTopicFilter = newTopicFilter + "#/";
-//                            break;
-//                        } else {
-//                            newTopicFilter = newTopicFilter + splitTopics.get(i) + "/";
-//                        }
-//                    }
-//                    newTopicFilter = StrUtil.removeSuffix(newTopicFilter, "/");
-//                    if (topicFilter.equals(newTopicFilter)) {
-//                        RetainMessageStore retainMessageStore = entry.getValue();
-//                        retainMessageStores.add(retainMessageStore);
-//                    }
-//                }
-//            });
-//        }
         return retainMessageStores;
     }
 
