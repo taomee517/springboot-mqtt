@@ -16,4 +16,6 @@ spring:
       websocket-path: /mqtt
       ssl-password: 123456
       ssl-enable: true
+      server-key-path: keystore/mqtt-broker.pfx
+#      root-key-path: keystore/root.jks
       default-internal-topic: $internal$

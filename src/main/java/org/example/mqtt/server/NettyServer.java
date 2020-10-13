@@ -22,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.mqtt.config.MqttProperties;
 import org.example.mqtt.handlers.BrokerHandler;
 import org.example.mqtt.handlers.MqttLoggerHandler;
+import org.example.mqtt.handlers.MqttWebSocketCodec;
 import org.example.mqtt.utils.RemotingUtil;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,6 +68,7 @@ public class NettyServer implements InitializingBean, SmartLifecycle {
     private Map<Integer, Channel> channelMap = new ConcurrentHashMap<>();
     private SslContext sslContext;
     private boolean running = false;
+    private boolean sslEnable = false;
 
     @Override
     public void afterPropertiesSet() throws Exception {
@@ -76,42 +78,44 @@ public class NettyServer implements InitializingBean, SmartLifecycle {
     @Override
     public void start() {
         initEventPool();
+        sslEnable = mqttProperties.getSslEnable();
         sslContext = buildSslContext();
         mqttServer();
+        webSocketServer();
         running = true;
     }
 
     private SslContext buildSslContext() {
         try {
-//            KeyStore keyStore = KeyStore.getInstance("PKCS12");
-//            InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream("keystore/mqtt-broker.pfx");
-//            keyStore.load(inputStream, mqttProperties.getSslPassword().toCharArray());
-//            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-//            kmf.init(keyStore, mqttProperties.getSslPassword().toCharArray());
-//            return SslContextBuilder.forServer(kmf).build();
+            KeyStore keyStore = KeyStore.getInstance("PKCS12");
+            InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream(mqttProperties.getServerKeyPath());
+            keyStore.load(inputStream, mqttProperties.getSslPassword().toCharArray());
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+            kmf.init(keyStore, mqttProperties.getSslPassword().toCharArray());
+            return SslContextBuilder.forServer(kmf).build();
 
             /*
              * 加载server.keystore
-             *
+             * JKS -> PKCS12
              */
-            KeyStore serverKeyStore = KeyStore.getInstance("PKCS12");
-            InputStream serverKeyStoreInputStream = this.getClass().getClassLoader().getResourceAsStream("keystore/mqtt-broker.pfx");
-            serverKeyStore.load(serverKeyStoreInputStream, mqttProperties.getSslPassword().toCharArray());
-            /*
-             * 加载servertrust.keystore
-             *
-             */
-            KeyStore serverTrustKeyStore = KeyStore.getInstance("PKCS12");
-            InputStream serverTrustKeyStoreInputStream = this.getClass().getClassLoader().getResourceAsStream("keystore/mqtt-broker.pfx");
-            serverTrustKeyStore.load(serverTrustKeyStoreInputStream, mqttProperties.getSslPassword().toCharArray());
-
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-            kmf.init(serverKeyStore, mqttProperties.getSslPassword().toCharArray());
-
-            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            tmf.init(serverTrustKeyStore);
-
-            return SslContextBuilder.forServer(kmf).trustManager(tmf).build();
+//            KeyStore serverKeyStore = KeyStore.getInstance("PKCS12");
+//            InputStream serverKeyStoreInputStream = this.getClass().getClassLoader().getResourceAsStream(mqttProperties.getServerKeyPath());
+//            serverKeyStore.load(serverKeyStoreInputStream, mqttProperties.getSslPassword().toCharArray());
+//            /*
+//             * 加载servertrust.keystore
+//             *
+//             */
+//            KeyStore serverTrustKeyStore = KeyStore.getInstance("PKCS12");
+//            InputStream serverTrustKeyStoreInputStream = this.getClass().getClassLoader().getResourceAsStream(mqttProperties.getRootKeyPath());
+//            serverTrustKeyStore.load(serverTrustKeyStoreInputStream, mqttProperties.getSslPassword().toCharArray());
+//
+//            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+//            kmf.init(serverKeyStore, mqttProperties.getSslPassword().toCharArray());
+//
+//            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+//            tmf.init(serverTrustKeyStore);
+//
+//            return SslContextBuilder.forServer(kmf).trustManager(tmf).build();
         } catch (Exception e) {
             log.info("初始化sslContext发异常：" + e.getMessage(), e);
             return null;
@@ -142,9 +146,9 @@ public class NettyServer implements InitializingBean, SmartLifecycle {
                         pipeline.addLast("broker", brokerHandler);
                     }
                 });
-            int port = mqttProperties.getSslEnable()?mqttProperties.getSslPort():mqttProperties.getTcpPort();
+            int port = sslEnable?mqttProperties.getSslPort():mqttProperties.getTcpPort();
             ChannelFuture channelFuture = server.bind(port).sync();
-            log.info("成功监听MQTT端口：{}, SSL加密：{}", port, mqttProperties.getSslEnable());
+            log.info("成功监听MQTT端口：{}, SSL加密：{}", port, sslEnable);
             Channel channel = channelFuture.channel();
             channelMap.put(port, channel);
         } catch (Exception e) {
@@ -163,33 +167,32 @@ public class NettyServer implements InitializingBean, SmartLifecycle {
                         @Override
                         protected void initChannel(SocketChannel socketChannel) throws Exception {
                             ChannelPipeline pipeline = socketChannel.pipeline();
-                            // Netty提供的心跳检测
-//                            pipeline.addFirst("idle", new IdleStateHandler(0, 0, 60));
-    //                        // Netty提供的SSL处理
-    //                        SSLEngine sslEngine = sslContext.newEngine(socketChannel.alloc());
-    //                        sslEngine.setUseClientMode(false);        // 服务端模式
-    //                        sslEngine.setNeedClientAuth(false);        // 不需要验证客户端
-    //                        pipeline.addLast("ssl", new SslHandler(sslEngine));
+                            if (mqttProperties.getSslEnable()) {
+                                // Netty提供的SSL处理
+                                SSLEngine sslEngine = sslContext.newEngine(socketChannel.alloc());
+                                // 服务端模式
+                                sslEngine.setUseClientMode(false);
+                                // 不需要验证客户端
+                                sslEngine.setNeedClientAuth(false);
+                                pipeline.addLast("ssl", new SslHandler(sslEngine));
+                            }
                             // 将请求和应答消息编码或解码为HTTP消息
                             pipeline.addLast("http-codec", new HttpServerCodec());
-                           // ChunkedWriteHandler：向客户端发送HTML5文件
-                            pipeline.addLast("http-chunked",new ChunkedWriteHandler());
                             // 将HTTP消息的多个部分合成一条完整的HTTP消息
                             pipeline.addLast("aggregator", new HttpObjectAggregator(1048576));
                             // 将HTTP消息进行压缩编码
                             pipeline.addLast("compressor ", new HttpContentCompressor());
-                            pipeline.addLast("protocol", new WebSocketServerProtocolHandler("/ws", "mqtt,mqttv3.1,mqttv3.1.1", true, 65536));
-//                            pipeline.addLast("basic-handler", webSocketActionHandler);
-
-//                            pipeline.addLast("mqttWebSocket", new MqttWebSocketCodec());
-//                            pipeline.addLast("decoder", new MqttDecoder());
-//                            pipeline.addLast("encoder", MqttEncoder.INSTANCE);
-//                            pipeline.addLast("broker", handlers.brokerHandler);
+                            pipeline.addLast("protocol", new WebSocketServerProtocolHandler(mqttProperties.getWebsocketPath(), "mqtt,mqttv3.1,mqttv3.1.1", true, 65536));
+                            pipeline.addLast("mqttWebSocket", new MqttWebSocketCodec());
+                            pipeline.addLast("decoder", new MqttDecoder());
+                            pipeline.addLast("encoder", MqttEncoder.INSTANCE);
+                            pipeline.addLast("logger", mqttLoggerHandler);
+                            pipeline.addLast("broker", brokerHandler);
                         }
                     });
-            int wsPort = mqttProperties.getWsPort();
+            int wsPort = sslEnable?mqttProperties.getWssPort():mqttProperties.getWsPort();
             Channel wsChannel = bootstrap.bind(wsPort).sync().channel();
-            log.info("成功监听WebSocket端口：{}", wsPort);
+            log.info("成功监听WebSocket端口：{}, SSL加密：{}", wsPort, sslEnable);
             channelMap.put(wsPort, wsChannel);
         } catch (InterruptedException e) {
             e.printStackTrace();

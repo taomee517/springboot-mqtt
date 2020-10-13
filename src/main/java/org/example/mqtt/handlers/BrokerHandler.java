@@ -1,5 +1,6 @@
 package org.example.mqtt.handlers;
 
+import com.alibaba.fastjson.JSON;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.handler.codec.mqtt.*;
@@ -12,11 +13,17 @@ import org.example.mqtt.context.mqtt.MqttProcessor;
 import org.example.mqtt.context.mqtt.SessionStore;
 import org.example.mqtt.service.IMqttService;
 import org.example.mqtt.utils.BytesUtil;
+import org.example.mqtt.utils.logger.DeviceLog;
+import org.example.mqtt.utils.logger.StreamType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * @author 罗涛
@@ -26,7 +33,7 @@ import java.io.IOException;
 @Slf4j
 @Component
 @ChannelHandler.Sharable
-public class BrokerHandler extends ChannelDuplexHandler {
+public class BrokerHandler extends ChannelDuplexHandler{
 
     @Autowired
     MqttProcessor mqttProcessor;
@@ -162,56 +169,59 @@ public class BrokerHandler extends ChannelDuplexHandler {
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
         if (msg instanceof MqttMessage) {
-            ctx.writeAndFlush(msg);
+            ctx.writeAndFlush(msg, promise);
+        }else {
+            log.warn("不支持的消息类型：{}", msg.getClass());
+            ctx.writeAndFlush(msg, promise);
         }
     }
 
     public void recordUpstreamLog(MqttMessage message, ChannelHandlerContext context){
-//        String clientId = ContextManager.getClientId(context.channel());
-//        MqttMessageType mqttMessageType = message.fixedHeader().messageType();
-//        Map<String, Object> content = new HashMap<>();
-//        content.put("fixedHeader", message.fixedHeader().toString());
-//        switch (mqttMessageType){
-//            case CONNECT:
-//                clientId = ((MqttConnectPayload) message.payload()).clientIdentifier();
-//            case DISCONNECT:
-//            case PINGREQ:
-//            case SUBSCRIBE:
-//            case UNSUBSCRIBE:
-//            case PUBLISH:
-//            case PUBREL:
-//            case PUBREC:
-//            case PUBCOMP:
-//            default:
-//                break;
-//        }
-//        Object variableHeader = message.variableHeader();
-//        if(Objects.nonNull(variableHeader)){
-//            content.put("variableHeader", variableHeader.toString());
-//        }
-//        Object payload = message.payload();
-//        log.info("上行消息：clientId = {}, msgType={}, payload={}",clientId, mqttMessageType, payload);
-//        DeviceLog deviceLog = new DeviceLog();
-//        deviceLog.setMsgTime(new Date());
-//        deviceLog.setDeviceId(clientId);
-//        deviceLog.setDirection(StreamType.UP_STREAM);
-//        String localIp = System.getProperty("local-ip");
-//        deviceLog.setServerIp(localIp);
-//        if(Objects.nonNull(payload)){
-//            if(payload instanceof ByteBuf){
-//                ByteBuf byteBuf = (ByteBuf) payload;
-//                byte[] bytes = new byte[byteBuf.readableBytes()];
-//                byteBuf.getBytes(0, bytes);
-//                //从channel中获取protocol 实例
-//                String plainPayload = mqttService.parsePayload(bytes);
-//                content.put("payload", plainPayload);
-//            }else {
-//                content.put("payload", payload.toString());
-//            }
-//        }
-//        deviceLog.setContent(JSON.toJSONString(content));
-//        deviceLog.setSensorType(99999);
-//        jsonKafka.send(kafkaTopicProperties.deviceLog, deviceLog);
+        String clientId = ContextManager.getClientId(context.channel());
+        MqttMessageType mqttMessageType = message.fixedHeader().messageType();
+        Map<String, Object> content = new HashMap<>();
+        content.put("fixedHeader", message.fixedHeader().toString());
+        switch (mqttMessageType){
+            case CONNECT:
+                clientId = ((MqttConnectPayload) message.payload()).clientIdentifier();
+            case DISCONNECT:
+            case PINGREQ:
+            case SUBSCRIBE:
+            case UNSUBSCRIBE:
+            case PUBLISH:
+            case PUBREL:
+            case PUBREC:
+            case PUBCOMP:
+            default:
+                break;
+        }
+        Object variableHeader = message.variableHeader();
+        if(Objects.nonNull(variableHeader)){
+            content.put("variableHeader", variableHeader.toString());
+        }
+        Object payload = message.payload();
+        log.info("上行消息：clientId = {}, msgType={}, payload={}",clientId, mqttMessageType, payload);
+        DeviceLog deviceLog = new DeviceLog();
+        deviceLog.setMsgTime(new Date());
+        deviceLog.setDeviceId(clientId);
+        deviceLog.setDirection(StreamType.UP_STREAM);
+        String localIp = System.getProperty("local-ip");
+        deviceLog.setServerIp(localIp);
+        if(Objects.nonNull(payload)){
+            if(payload instanceof ByteBuf){
+                ByteBuf byteBuf = (ByteBuf) payload;
+                byte[] bytes = new byte[byteBuf.readableBytes()];
+                byteBuf.getBytes(0, bytes);
+                //从channel中获取protocol 实例
+                String plainPayload = mqttService.parsePayload(bytes);
+                content.put("payload", plainPayload);
+            }else {
+                content.put("payload", payload.toString());
+            }
+        }
+        deviceLog.setContent(JSON.toJSONString(content));
+        deviceLog.setSensorType(99999);
+        jsonKafka.send(kafkaTopicProperties.deviceLog, deviceLog);
     }
 
 }

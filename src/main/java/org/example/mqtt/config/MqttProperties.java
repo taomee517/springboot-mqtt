@@ -29,6 +29,9 @@ public class MqttProperties {
     private String username;
     private String password;
 
+    private String serverKeyPath;
+    private String rootKeyPath;
+
     /**
      * SSL密钥文件密码
      */

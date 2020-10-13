@@ -95,7 +95,7 @@ public class MqttLoggerHandler extends ChannelOutboundHandlerAdapter{
                 }
             }
         } finally {
-            ctx.writeAndFlush(msg);
+            ctx.writeAndFlush(msg, promise);
         }
     }
 
