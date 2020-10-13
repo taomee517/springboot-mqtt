@@ -142,47 +142,83 @@ public class ContextManager {
     }
 
 
-    public static void putNotWildSubscribeMessage(String topicFilter, SubscribeStore subscribeStore) {
-        ConcurrentHashMap<String, SubscribeStore> map =
-                subscribeNotWildcardMap.containsKey(topicFilter) ? subscribeNotWildcardMap.get(topicFilter) : new ConcurrentHashMap<String, SubscribeStore>();
-        map.put(subscribeStore.getClientId(), subscribeStore);
-        subscribeNotWildcardMap.put(topicFilter, map);
+    public static void putSubscribeMessage(String topicFilter, SubscribeStore subscribeStore) {
+        //含通配符的topic
+        if (StringUtils.contains(topicFilter, '#') || StringUtils.contains(topicFilter, '+')) {
+            ConcurrentHashMap<String, SubscribeStore> map =
+                    subscribeWildcardMap.containsKey(topicFilter) ? subscribeWildcardMap.get(topicFilter) : new ConcurrentHashMap<String, SubscribeStore>();
+            map.put(subscribeStore.getClientId(), subscribeStore);
+            subscribeWildcardMap.put(topicFilter, map);
+        } else {
+            ConcurrentHashMap<String, SubscribeStore> map =
+                    subscribeNotWildcardMap.containsKey(topicFilter) ? subscribeNotWildcardMap.get(topicFilter) : new ConcurrentHashMap<String, SubscribeStore>();
+            map.put(subscribeStore.getClientId(), subscribeStore);
+            subscribeNotWildcardMap.put(topicFilter, map);
+        }
     }
 
-    public static void removeNotWildSubscribeMessage(String topicFilter, String clientId) {
-        if (subscribeNotWildcardMap.containsKey(topicFilter)) {
-            ConcurrentHashMap<String, SubscribeStore> map = subscribeNotWildcardMap.get(topicFilter);
-            if (map.containsKey(clientId)) {
-                map.remove(clientId);
-                if (map.size() > 0) {
-                    subscribeNotWildcardMap.put(topicFilter, map);
-                } else {
-                    subscribeNotWildcardMap.remove(topicFilter);
+    public static void removeSubscribeMessage(String topicFilter, String clientId) {
+        if (StringUtils.contains(topicFilter, '#') || StringUtils.contains(topicFilter, '+')) {
+            if (subscribeWildcardMap.containsKey(topicFilter)) {
+                ConcurrentHashMap<String, SubscribeStore> map = subscribeWildcardMap.get(topicFilter);
+                if (map.containsKey(clientId)) {
+                    map.remove(clientId);
+                    if (map.size() > 0) {
+                        subscribeWildcardMap.put(topicFilter, map);
+                    } else {
+                        subscribeWildcardMap.remove(topicFilter);
+                    }
+                }
+            }
+        } else {
+            if (subscribeNotWildcardMap.containsKey(topicFilter)) {
+                ConcurrentHashMap<String, SubscribeStore> map = subscribeNotWildcardMap.get(topicFilter);
+                if (map.containsKey(clientId)) {
+                    map.remove(clientId);
+                    if (map.size() > 0) {
+                        subscribeNotWildcardMap.put(topicFilter, map);
+                    } else {
+                        subscribeNotWildcardMap.remove(topicFilter);
+                    }
                 }
             }
         }
     }
 
-    public static void removeNotWildSubscribeMessage(String clientId) {
+    public static void removeSubscribeMessage(String clientId) {
         Set<String> topics = subscribeNotWildcardMap.keySet();
-        if(CollectionUtils.isEmpty(topics)){
-            return;
+        if(!CollectionUtils.isEmpty(topics)){
+            for(String topic:topics){
+                ConcurrentHashMap<String, SubscribeStore> map = subscribeNotWildcardMap.get(topic);
+                if (map.containsKey(clientId)) {
+                    map.remove(clientId);
+                    if (map.size() > 0) {
+                        subscribeNotWildcardMap.put(topic, map);
+                    } else {
+                        subscribeNotWildcardMap.remove(topic);
+                    }
+                }
+            }
         }
-        for(String topic:topics){
-            ConcurrentHashMap<String, SubscribeStore> map = subscribeNotWildcardMap.get(topic);
-            if (map.containsKey(clientId)) {
-                map.remove(clientId);
-                if (map.size() > 0) {
-                    subscribeNotWildcardMap.put(topic, map);
-                } else {
-                    subscribeNotWildcardMap.remove(topic);
+
+        Set<String> wildcardTopics = subscribeWildcardMap.keySet();
+        if(!CollectionUtils.isEmpty(wildcardTopics)){
+            for(String topic : wildcardTopics){
+                ConcurrentHashMap<String, SubscribeStore> map = subscribeWildcardMap.get(topic);
+                if (map.containsKey(clientId)) {
+                    map.remove(clientId);
+                    if (map.size() > 0) {
+                        subscribeWildcardMap.put(topic, map);
+                    } else {
+                        subscribeWildcardMap.remove(topic);
+                    }
                 }
             }
         }
     }
 
 
-    public static List<SubscribeStore> searchNotWildSubscribeMessage(String topic) {
+    public static List<SubscribeStore> searchSubscribeMessage(String topic) {
         List<SubscribeStore> subscribeStores = new ArrayList<SubscribeStore>();
         if (subscribeNotWildcardMap.containsKey(topic)) {
             ConcurrentHashMap<String, SubscribeStore> map = subscribeNotWildcardMap.get(topic);
@@ -190,31 +226,32 @@ public class ContextManager {
             List<SubscribeStore> list = new ArrayList<SubscribeStore>(collection);
             subscribeStores.addAll(list);
         }
-//        subscribeWildcardMap.keySet().forEach(key -> {
-//            ConcurrentHashMap<String, SubscribeStore> entry = subscribeWildcardMap.get(key);
-//            if (StringUtils.split(key, '/').length >= StringUtils.split(key, '/').length) {
-//                List<String> splitTopics = Arrays.asList(StringUtils.split(key, '/'));
-//                List<String> spliteTopicFilters = Arrays.asList(StringUtils.split(key, '/'));
-//                String newTopicFilter = "";
-//                for (int i = 0; i < spliteTopicFilters.size(); i++) {
-//                    String value = spliteTopicFilters.get(i);
-//                    if (value.equals("+")) {
-//                        newTopicFilter = newTopicFilter + "+/";
-//                    } else if (value.equals("#")) {
-//                        newTopicFilter = newTopicFilter + "#/";
-//                        break;
-//                    } else {
-//                        newTopicFilter = newTopicFilter + splitTopics.get(i) + "/";
-//                    }
-//                }
-//                newTopicFilter = StringUtils.removeEnd(newTopicFilter, "/");
-//                if (key.equals(newTopicFilter)) {
-//                    Collection<SubscribeStore> collection = entry.values();
-//                    List<SubscribeStore> list = new ArrayList<SubscribeStore>(collection);
-//                    subscribeStores.addAll(list);
-//                }
-//            }
-//        });
+        //含通配符的topic
+        subscribeWildcardMap.keySet().forEach(key -> {
+            ConcurrentHashMap<String, SubscribeStore> entry = subscribeWildcardMap.get(key);
+            if (StringUtils.split(topic, '/').length >= StringUtils.split(key, '/').length) {
+                List<String> splitTopics = Arrays.asList(StringUtils.split(topic, '/'));
+                List<String> splitTopicFilters = Arrays.asList(StringUtils.split(key, '/'));
+                String newTopicFilter = "";
+                for (int i = 0; i < splitTopicFilters.size(); i++) {
+                    String value = splitTopicFilters.get(i);
+                    if (value.equals("+")) {
+                        newTopicFilter = newTopicFilter + "+/";
+                    } else if (value.equals("#")) {
+                        newTopicFilter = newTopicFilter + "#/";
+                        break;
+                    } else {
+                        newTopicFilter = newTopicFilter + splitTopics.get(i) + "/";
+                    }
+                }
+                newTopicFilter = StringUtils.removeEnd(newTopicFilter, "/");
+                if (key.equals(newTopicFilter)) {
+                    Collection<SubscribeStore> collection = entry.values();
+                    List<SubscribeStore> list = new ArrayList<SubscribeStore>(collection);
+                    subscribeStores.addAll(list);
+                }
+            }
+        });
         return subscribeStores;
     }
 
@@ -236,8 +273,34 @@ public class ContextManager {
 
     public static List<RetainMessageStore> searchRetainMessage(String topicFilter) {
         List<RetainMessageStore> retainMessageStores = new ArrayList<RetainMessageStore>();
-        if (retainMessageStoreMap.containsKey(topicFilter)) {
-            retainMessageStores.add(retainMessageStoreMap.get(topicFilter));
+        if (!StringUtils.contains(topicFilter, '#') && !StringUtils.contains(topicFilter, '+')) {
+            if (retainMessageStoreMap.containsKey(topicFilter)) {
+                retainMessageStores.add(retainMessageStoreMap.get(topicFilter));
+            }
+        }else {
+            retainMessageStoreMap.keySet().forEach(topic -> {
+                RetainMessageStore retainMessageStore = retainMessageStoreMap.get(topic);
+                if (StringUtils.split(topic, '/').length >= StringUtils.split(topicFilter, '/').length) {
+                    List<String> splitTopics = Arrays.asList(StringUtils.split(topic, '/'));
+                    List<String> splitTopicFilters = Arrays.asList(StringUtils.split(topicFilter, '/'));
+                    String newTopicFilter = "";
+                    for (int i = 0; i < splitTopicFilters.size(); i++) {
+                        String value = splitTopicFilters.get(i);
+                        if (value.equals("+")) {
+                            newTopicFilter = newTopicFilter + "+/";
+                        } else if (value.equals("#")) {
+                            newTopicFilter = newTopicFilter + "#/";
+                            break;
+                        } else {
+                            newTopicFilter = newTopicFilter + splitTopics.get(i) + "/";
+                        }
+                    }
+                    newTopicFilter = StringUtils.removeEnd(newTopicFilter, "/");
+                    if (topicFilter.equals(newTopicFilter)) {
+                        retainMessageStores.add(retainMessageStore);
+                    }
+                }
+            });
         }
         return retainMessageStores;
     }

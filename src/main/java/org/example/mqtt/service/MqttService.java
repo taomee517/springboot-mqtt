@@ -131,22 +131,22 @@ public class MqttService implements IMqttService {
 
     @Override
     public void putSubscribeMessage(String topicFilter, SubscribeStore subscribeStore) {
-        ContextManager.putNotWildSubscribeMessage(topicFilter, subscribeStore);
+        ContextManager.putSubscribeMessage(topicFilter, subscribeStore);
     }
 
     @Override
     public void removeSubscribeMessage(String topicFilter, String clientId) {
-        ContextManager.removeNotWildSubscribeMessage(topicFilter, clientId);
+        ContextManager.removeSubscribeMessage(topicFilter, clientId);
     }
 
     @Override
     public void removeSubscribeByClient(String clientIdentifier) {
-        ContextManager.removeNotWildSubscribeMessage(clientIdentifier);
+        ContextManager.removeSubscribeMessage(clientIdentifier);
     }
 
     @Override
     public List<SubscribeStore> searchSubscribe(String topic) {
-        return ContextManager.searchNotWildSubscribeMessage(topic);
+        return ContextManager.searchSubscribeMessage(topic);
     }
 
 
