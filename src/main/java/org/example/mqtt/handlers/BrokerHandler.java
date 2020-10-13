@@ -9,7 +9,6 @@ import io.netty.handler.timeout.IdleStateEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.example.mqtt.config.KafkaTopicProperties;
 import org.example.mqtt.context.ContextManager;
-import org.example.mqtt.context.mqtt.MqttProcessor;
 import org.example.mqtt.context.mqtt.SessionStore;
 import org.example.mqtt.service.IMqttService;
 import org.example.mqtt.utils.BytesUtil;
@@ -46,6 +45,9 @@ public class BrokerHandler extends ChannelDuplexHandler{
 
     @Autowired
     KafkaTopicProperties kafkaTopicProperties;
+
+    @Autowired
+    ContextManager contextManager;
 
 
     @Override
@@ -148,7 +150,7 @@ public class BrokerHandler extends ChannelDuplexHandler{
         if (evt instanceof IdleStateEvent) {
             IdleStateEvent idleStateEvent = (IdleStateEvent) evt;
             if (idleStateEvent.state() == IdleState.ALL_IDLE) {
-                String clientId = ContextManager.getClientId(ctx.channel());
+                String clientId = contextManager.getClientId(ctx.channel());
                 Channel channel = ctx.channel();
                 // 发送遗嘱消息
                 if (mqttService.containsSession(clientId)) {
@@ -175,7 +177,7 @@ public class BrokerHandler extends ChannelDuplexHandler{
     }
 
     public void recordUpstreamLog(MqttMessage message, ChannelHandlerContext context){
-        String clientId = ContextManager.getClientId(context.channel());
+        String clientId = contextManager.getClientId(context.channel());
         MqttMessageType mqttMessageType = message.fixedHeader().messageType();
         Map<String, Object> content = new HashMap<>();
         content.put("fixedHeader", message.fixedHeader().toString());

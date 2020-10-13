@@ -5,9 +5,12 @@ import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.ignite.IgniteCache;
 import org.example.mqtt.context.mqtt.*;
+import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+import javax.annotation.Resource;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -17,20 +20,42 @@ import java.util.concurrent.ConcurrentHashMap;
  * @date 2020/6/22 15:11
  */
 @Slf4j
+@Component
 public class ContextManager {
     public static AttributeKey<String> MQTT_CLIENT_ID = AttributeKey.newInstance("mqtt_client_id");
     public static Map<String, SessionStore> sessionStoreMap = new ConcurrentHashMap<>();
-    public static Map<String, ConcurrentHashMap<Integer, DupPublishMessageStore>> dupPublishMessageStoreMap = new ConcurrentHashMap<>();
-    public static Map<String, ConcurrentHashMap<Integer, DupPubRelMessageStore>> dupPubRelMessageStoreMap = new ConcurrentHashMap<>();
-    public static Map<String, RetainMessageStore> retainMessageStoreMap = new ConcurrentHashMap<>();
-    public static Map<String, ConcurrentHashMap<String, SubscribeStore>> subscribeNotWildcardMap = new ConcurrentHashMap<>();
-    public static Map<String, ConcurrentHashMap<String, SubscribeStore>> subscribeWildcardMap = new ConcurrentHashMap<>();
 
-    public static void putClientId(Channel channel, String clientId){
+//    public  Map<String, ConcurrentHashMap<Integer, DupPublishMessageStore>> dupPublishMessageStoreMap = new ConcurrentHashMap<>();
+//    public  Map<String, ConcurrentHashMap<Integer, DupPubRelMessageStore>> dupPubRelMessageStoreMap = new ConcurrentHashMap<>();
+//    public  Map<String, RetainMessageStore> retainMessageStoreMap = new ConcurrentHashMap<>();
+//    public  Map<String, ConcurrentHashMap<String, SubscribeStore>> subscribeNotWildcardCache = new ConcurrentHashMap<>();
+//    public  Map<String, ConcurrentHashMap<String, SubscribeStore>> subscribeWildcardCache = new ConcurrentHashMap<>();
+
+    @Resource
+    private IgniteCache<Integer, Integer> messageIdCache;
+
+    @Resource
+    private IgniteCache<String, RetainMessageStore> retainMessageCache;
+
+    @Resource
+    private IgniteCache<String, ConcurrentHashMap<Integer, DupPublishMessageStore>> dupPublishMessageCache;
+
+    @Resource
+    private IgniteCache<String, ConcurrentHashMap<Integer, DupPubRelMessageStore>> dupPubRelMessageCache;
+
+    @Resource
+    private IgniteCache<String, ConcurrentHashMap<String, SubscribeStore>> subscribeNotWildcardCache;
+
+    @Resource
+    private IgniteCache<String, ConcurrentHashMap<String, SubscribeStore>> subscribeWildcardCache;
+
+
+
+    public  void putClientId(Channel channel, String clientId){
         channel.attr(MQTT_CLIENT_ID).set(clientId);
     }
 
-    public static String getClientId(Channel channel){
+    public  String getClientId(Channel channel){
         Attribute<String> attr = channel.attr(MQTT_CLIENT_ID);
         if(Objects.isNull(attr)){
             return null;
@@ -39,196 +64,190 @@ public class ContextManager {
         return clientId;
     }
 
-    public static void removeClientId(Channel channel){
+    public  void removeClientId(Channel channel){
         channel.attr(MQTT_CLIENT_ID).set(null);
     }
 
-    public static boolean containsSessionStore(String clientIdentifier) {
+    public  boolean containsSessionStore(String clientIdentifier) {
         return sessionStoreMap.containsKey(clientIdentifier);
     }
 
-    public static SessionStore getSessionStore(String clientIdentifier) {
+    public  SessionStore getSessionStore(String clientIdentifier) {
         return sessionStoreMap.get(clientIdentifier);
     }
 
-    public static void clearSessionStore(String clientIdentifier) {
+    public  void clearSessionStore(String clientIdentifier) {
         sessionStoreMap.remove(clientIdentifier);
     }
 
-    public static void putSessionStore(String clientIdentifier, SessionStore session) {
+    public  void putSessionStore(String clientIdentifier, SessionStore session) {
         sessionStoreMap.put(clientIdentifier, session);
     }
 
-    public static void putDupPublishMessage(String clientIdentifier, DupPublishMessageStore dupPublishMessageStore) {
-        ConcurrentHashMap<Integer, DupPublishMessageStore> map = dupPublishMessageStoreMap.containsKey(clientIdentifier) ? dupPublishMessageStoreMap.get(clientIdentifier) : new ConcurrentHashMap<Integer, DupPublishMessageStore>();
+    public  void putDupPublishMessage(String clientIdentifier, DupPublishMessageStore dupPublishMessageStore) {
+        ConcurrentHashMap<Integer, DupPublishMessageStore> map = dupPublishMessageCache.containsKey(clientIdentifier) ? dupPublishMessageCache.get(clientIdentifier) : new ConcurrentHashMap<Integer, DupPublishMessageStore>();
         map.put(dupPublishMessageStore.getMessageId(), dupPublishMessageStore);
-        dupPublishMessageStoreMap.put(clientIdentifier, map);
+        dupPublishMessageCache.put(clientIdentifier, map);
     }
 
-    public static List<DupPublishMessageStore> getDupPublishMessage(String clientIdentifier) {
-        if (dupPublishMessageStoreMap.containsKey(clientIdentifier)) {
-            ConcurrentHashMap<Integer, DupPublishMessageStore> map = dupPublishMessageStoreMap.get(clientIdentifier);
+    public  List<DupPublishMessageStore> getDupPublishMessage(String clientIdentifier) {
+        if (dupPublishMessageCache.containsKey(clientIdentifier)) {
+            ConcurrentHashMap<Integer, DupPublishMessageStore> map = dupPublishMessageCache.get(clientIdentifier);
             Collection<DupPublishMessageStore> collection = map.values();
             return new ArrayList<DupPublishMessageStore>(collection);
         }
         return Collections.emptyList();
     }
 
-    public static void removeDupPublishMessage(String clientIdentifier) {
-        if (dupPublishMessageStoreMap.containsKey(clientIdentifier)) {
-            ConcurrentHashMap<Integer, DupPublishMessageStore> map = dupPublishMessageStoreMap.get(clientIdentifier);
+    public  void removeDupPublishMessage(String clientIdentifier) {
+        if (dupPublishMessageCache.containsKey(clientIdentifier)) {
+            ConcurrentHashMap<Integer, DupPublishMessageStore> map = dupPublishMessageCache.get(clientIdentifier);
 //            map.forEach((messageId, dupPublishMessageStore) -> {
 //                messageIdService.releaseMessageId(messageId);  //todo
 //            });
             map.clear();
-            dupPublishMessageStoreMap.remove(clientIdentifier);
+            dupPublishMessageCache.remove(clientIdentifier);
         }
     }
 
-    public static void removeDupPublishMessage(String clientIdentifier,int messageId) {
-        if (dupPublishMessageStoreMap.containsKey(clientIdentifier)) {
-            ConcurrentHashMap<Integer, DupPublishMessageStore> map = dupPublishMessageStoreMap.get(clientIdentifier);
+    public  void removeDupPublishMessage(String clientIdentifier,int messageId) {
+        if (dupPublishMessageCache.containsKey(clientIdentifier)) {
+            ConcurrentHashMap<Integer, DupPublishMessageStore> map = dupPublishMessageCache.get(clientIdentifier);
             if (map.containsKey(messageId)) {
                 map.remove(messageId);
                 if (map.size() > 0) {
-                    dupPublishMessageStoreMap.put(clientIdentifier, map);
+                    dupPublishMessageCache.put(clientIdentifier, map);
                 } else {
-                    dupPublishMessageStoreMap.remove(clientIdentifier);
+                    dupPublishMessageCache.remove(clientIdentifier);
                 }
             }
         }
 
     }
 
-    public static void putDupPubRelMessage(String clientIdentifier, DupPubRelMessageStore dupPubRelMessageStore) {
-        ConcurrentHashMap<Integer, DupPubRelMessageStore> map = dupPubRelMessageStoreMap.containsKey(clientIdentifier) ? dupPubRelMessageStoreMap.get(clientIdentifier) : new ConcurrentHashMap<Integer, DupPubRelMessageStore>();
+    public  void putDupPubRelMessage(String clientIdentifier, DupPubRelMessageStore dupPubRelMessageStore) {
+        ConcurrentHashMap<Integer, DupPubRelMessageStore> map = dupPubRelMessageCache.containsKey(clientIdentifier) ? dupPubRelMessageCache.get(clientIdentifier) : new ConcurrentHashMap<Integer, DupPubRelMessageStore>();
         map.put(dupPubRelMessageStore.getMessageId(), dupPubRelMessageStore);
-        dupPubRelMessageStoreMap.put(clientIdentifier, map);
+        dupPubRelMessageCache.put(clientIdentifier, map);
     }
 
 
-    public static List<DupPubRelMessageStore> getDupPubRelMessage(String clientIdentifier) {
-        if (dupPubRelMessageStoreMap.containsKey(clientIdentifier)) {
-            ConcurrentHashMap<Integer, DupPubRelMessageStore> map = dupPubRelMessageStoreMap.get(clientIdentifier);
+    public  List<DupPubRelMessageStore> getDupPubRelMessage(String clientIdentifier) {
+        if (dupPubRelMessageCache.containsKey(clientIdentifier)) {
+            ConcurrentHashMap<Integer, DupPubRelMessageStore> map = dupPubRelMessageCache.get(clientIdentifier);
             Collection<DupPubRelMessageStore> collection = map.values();
             return new ArrayList<DupPubRelMessageStore>(collection);
         }
         return Collections.emptyList();
     }
 
-    public static void removeDupPubRelMessage(String clientId, int messageId) {
-        if (dupPubRelMessageStoreMap.containsKey(clientId)) {
-            ConcurrentHashMap<Integer, DupPubRelMessageStore> map = dupPubRelMessageStoreMap.get(clientId);
+    public  void removeDupPubRelMessage(String clientId, int messageId) {
+        if (dupPubRelMessageCache.containsKey(clientId)) {
+            ConcurrentHashMap<Integer, DupPubRelMessageStore> map = dupPubRelMessageCache.get(clientId);
             if (map.containsKey(messageId)) {
                 map.remove(messageId);
                 if (map.size() > 0) {
-                    dupPubRelMessageStoreMap.put(clientId, map);
+                    dupPubRelMessageCache.put(clientId, map);
                 } else {
-                    dupPubRelMessageStoreMap.remove(clientId);
+                    dupPubRelMessageCache.remove(clientId);
                 }
             }
         }
     }
 
-    public static void removeDupPubRelMessage(String clientIdentifier) {
-        if (dupPubRelMessageStoreMap.containsKey(clientIdentifier)) {
-            ConcurrentHashMap<Integer, DupPubRelMessageStore> map = dupPubRelMessageStoreMap.get(clientIdentifier);
+    public  void removeDupPubRelMessage(String clientIdentifier) {
+        if (dupPubRelMessageCache.containsKey(clientIdentifier)) {
+            ConcurrentHashMap<Integer, DupPubRelMessageStore> map = dupPubRelMessageCache.get(clientIdentifier);
 //            map.forEach((messageId, dupPubRelMessageStore) -> {
 //                messageIdService.releaseMessageId(messageId);
 //            });
             map.clear();
-            dupPubRelMessageStoreMap.remove(clientIdentifier);
+            dupPubRelMessageCache.remove(clientIdentifier);
         }
     }
 
 
-    public static void putSubscribeMessage(String topicFilter, SubscribeStore subscribeStore) {
+    public  void putSubscribeMessage(String topicFilter, SubscribeStore subscribeStore) {
         //含通配符的topic
         if (StringUtils.contains(topicFilter, '#') || StringUtils.contains(topicFilter, '+')) {
             ConcurrentHashMap<String, SubscribeStore> map =
-                    subscribeWildcardMap.containsKey(topicFilter) ? subscribeWildcardMap.get(topicFilter) : new ConcurrentHashMap<String, SubscribeStore>();
+                    subscribeWildcardCache.containsKey(topicFilter) ? subscribeWildcardCache.get(topicFilter) : new ConcurrentHashMap<String, SubscribeStore>();
             map.put(subscribeStore.getClientId(), subscribeStore);
-            subscribeWildcardMap.put(topicFilter, map);
+            subscribeWildcardCache.put(topicFilter, map);
         } else {
             ConcurrentHashMap<String, SubscribeStore> map =
-                    subscribeNotWildcardMap.containsKey(topicFilter) ? subscribeNotWildcardMap.get(topicFilter) : new ConcurrentHashMap<String, SubscribeStore>();
+                    subscribeNotWildcardCache.containsKey(topicFilter) ? subscribeNotWildcardCache.get(topicFilter) : new ConcurrentHashMap<String, SubscribeStore>();
             map.put(subscribeStore.getClientId(), subscribeStore);
-            subscribeNotWildcardMap.put(topicFilter, map);
+            subscribeNotWildcardCache.put(topicFilter, map);
         }
     }
 
-    public static void removeSubscribeMessage(String topicFilter, String clientId) {
+    public  void removeSubscribeMessage(String topicFilter, String clientId) {
         if (StringUtils.contains(topicFilter, '#') || StringUtils.contains(topicFilter, '+')) {
-            if (subscribeWildcardMap.containsKey(topicFilter)) {
-                ConcurrentHashMap<String, SubscribeStore> map = subscribeWildcardMap.get(topicFilter);
+            if (subscribeWildcardCache.containsKey(topicFilter)) {
+                ConcurrentHashMap<String, SubscribeStore> map = subscribeWildcardCache.get(topicFilter);
                 if (map.containsKey(clientId)) {
                     map.remove(clientId);
                     if (map.size() > 0) {
-                        subscribeWildcardMap.put(topicFilter, map);
+                        subscribeWildcardCache.put(topicFilter, map);
                     } else {
-                        subscribeWildcardMap.remove(topicFilter);
+                        subscribeWildcardCache.remove(topicFilter);
                     }
                 }
             }
         } else {
-            if (subscribeNotWildcardMap.containsKey(topicFilter)) {
-                ConcurrentHashMap<String, SubscribeStore> map = subscribeNotWildcardMap.get(topicFilter);
+            if (subscribeNotWildcardCache.containsKey(topicFilter)) {
+                ConcurrentHashMap<String, SubscribeStore> map = subscribeNotWildcardCache.get(topicFilter);
                 if (map.containsKey(clientId)) {
                     map.remove(clientId);
                     if (map.size() > 0) {
-                        subscribeNotWildcardMap.put(topicFilter, map);
+                        subscribeNotWildcardCache.put(topicFilter, map);
                     } else {
-                        subscribeNotWildcardMap.remove(topicFilter);
+                        subscribeNotWildcardCache.remove(topicFilter);
                     }
                 }
             }
         }
     }
 
-    public static void removeSubscribeMessage(String clientId) {
-        Set<String> topics = subscribeNotWildcardMap.keySet();
-        if(!CollectionUtils.isEmpty(topics)){
-            for(String topic:topics){
-                ConcurrentHashMap<String, SubscribeStore> map = subscribeNotWildcardMap.get(topic);
-                if (map.containsKey(clientId)) {
-                    map.remove(clientId);
-                    if (map.size() > 0) {
-                        subscribeNotWildcardMap.put(topic, map);
-                    } else {
-                        subscribeNotWildcardMap.remove(topic);
-                    }
+    public  void removeSubscribeMessage(String clientId) {
+        subscribeNotWildcardCache.forEach(entry -> {
+            ConcurrentHashMap<String, SubscribeStore> map = entry.getValue();
+            if (map.containsKey(clientId)) {
+                map.remove(clientId);
+                if (map.size() > 0) {
+                    subscribeNotWildcardCache.put(entry.getKey(), map);
+                } else {
+                    subscribeNotWildcardCache.remove(entry.getKey());
                 }
             }
-        }
-
-        Set<String> wildcardTopics = subscribeWildcardMap.keySet();
-        if(!CollectionUtils.isEmpty(wildcardTopics)){
-            for(String topic : wildcardTopics){
-                ConcurrentHashMap<String, SubscribeStore> map = subscribeWildcardMap.get(topic);
-                if (map.containsKey(clientId)) {
-                    map.remove(clientId);
-                    if (map.size() > 0) {
-                        subscribeWildcardMap.put(topic, map);
-                    } else {
-                        subscribeWildcardMap.remove(topic);
-                    }
+        });
+        subscribeWildcardCache.forEach(entry -> {
+            ConcurrentHashMap<String, SubscribeStore> map = entry.getValue();
+            if (map.containsKey(clientId)) {
+                map.remove(clientId);
+                if (map.size() > 0) {
+                    subscribeWildcardCache.put(entry.getKey(), map);
+                } else {
+                    subscribeWildcardCache.remove(entry.getKey());
                 }
             }
-        }
+        });
     }
 
 
-    public static List<SubscribeStore> searchSubscribeMessage(String topic) {
+    public  List<SubscribeStore> searchSubscribeMessage(String topic) {
         List<SubscribeStore> subscribeStores = new ArrayList<SubscribeStore>();
-        if (subscribeNotWildcardMap.containsKey(topic)) {
-            ConcurrentHashMap<String, SubscribeStore> map = subscribeNotWildcardMap.get(topic);
+        if (subscribeNotWildcardCache.containsKey(topic)) {
+            ConcurrentHashMap<String, SubscribeStore> map = subscribeNotWildcardCache.get(topic);
             Collection<SubscribeStore> collection = map.values();
             List<SubscribeStore> list = new ArrayList<SubscribeStore>(collection);
             subscribeStores.addAll(list);
         }
         //含通配符的topic
-        subscribeWildcardMap.keySet().forEach(key -> {
-            ConcurrentHashMap<String, SubscribeStore> entry = subscribeWildcardMap.get(key);
+        subscribeWildcardCache.forEach(sData -> {
+            String key = sData.getKey();
+            ConcurrentHashMap<String, SubscribeStore> entry = sData.getValue();
             if (StringUtils.split(topic, '/').length >= StringUtils.split(key, '/').length) {
                 List<String> splitTopics = Arrays.asList(StringUtils.split(topic, '/'));
                 List<String> splitTopicFilters = Arrays.asList(StringUtils.split(key, '/'));
@@ -255,31 +274,32 @@ public class ContextManager {
         return subscribeStores;
     }
 
-    public static void putRetainMessage(String topic, RetainMessageStore retainMessageStore) {
-        retainMessageStoreMap.put(topic, retainMessageStore);
+    public  void putRetainMessage(String topic, RetainMessageStore retainMessageStore) {
+        retainMessageCache.put(topic, retainMessageStore);
     }
 
-    public static RetainMessageStore getRetainMessage(String topic) {
-        return retainMessageStoreMap.get(topic);
+    public  RetainMessageStore getRetainMessage(String topic) {
+        return retainMessageCache.get(topic);
     }
 
-    public static void removeRetainMessage(String topic) {
-        retainMessageStoreMap.remove(topic);
+    public  void removeRetainMessage(String topic) {
+        retainMessageCache.remove(topic);
     }
 
-    public static boolean containsRetainMessageKey(String topic) {
-        return retainMessageStoreMap.containsKey(topic);
+    public  boolean containsRetainMessageKey(String topic) {
+        return retainMessageCache.containsKey(topic);
     }
 
-    public static List<RetainMessageStore> searchRetainMessage(String topicFilter) {
+    public  List<RetainMessageStore> searchRetainMessage(String topicFilter) {
         List<RetainMessageStore> retainMessageStores = new ArrayList<RetainMessageStore>();
         if (!StringUtils.contains(topicFilter, '#') && !StringUtils.contains(topicFilter, '+')) {
-            if (retainMessageStoreMap.containsKey(topicFilter)) {
-                retainMessageStores.add(retainMessageStoreMap.get(topicFilter));
+            if (retainMessageCache.containsKey(topicFilter)) {
+                retainMessageStores.add(retainMessageCache.get(topicFilter));
             }
         }else {
-            retainMessageStoreMap.keySet().forEach(topic -> {
-                RetainMessageStore retainMessageStore = retainMessageStoreMap.get(topic);
+            retainMessageCache.forEach(sData -> {
+                String topic = sData.getKey();
+                RetainMessageStore retainMessageStore = sData.getValue();
                 if (StringUtils.split(topic, '/').length >= StringUtils.split(topicFilter, '/').length) {
                     List<String> splitTopics = Arrays.asList(StringUtils.split(topic, '/'));
                     List<String> splitTopicFilters = Arrays.asList(StringUtils.split(topicFilter, '/'));

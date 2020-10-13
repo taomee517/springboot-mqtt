@@ -2,7 +2,7 @@
  * Copyright (c) 2018, Mr.Wang (recallcode@aliyun.com) All rights reserved.
  */
 
-package org.example.mqtt.context.mqtt;
+package org.example.mqtt.handlers;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -13,6 +13,9 @@ import io.netty.util.CharsetUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.example.mqtt.context.ContextManager;
+import org.example.mqtt.context.mqtt.*;
+import org.example.mqtt.ignite.ClusterCommunication;
+import org.example.mqtt.ignite.InternalMessage;
 import org.example.mqtt.service.IAuthService;
 import org.example.mqtt.service.IMqttService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,12 +31,17 @@ import java.util.List;
 @Slf4j
 @Component
 public class MqttProcessor {
+	@Autowired
+	ContextManager contextManager;
 
 	@Autowired
 	IMqttService mqttService;
 
 	@Autowired
 	IAuthService authService;
+
+	@Autowired
+	ClusterCommunication clusterCommunication;
 
 	public void processConnect(Channel channel, MqttConnectMessage msg) {
 		// 消息解码器出现异常
@@ -112,7 +120,7 @@ public class MqttProcessor {
 		// 至此存储会话信息及返回接受客户端连接
 		mqttService.putSession(clientIdentifier, sessionStore);
 		// 将clientId存储到channel的map中
-		ContextManager.putClientId(channel,clientIdentifier);
+		contextManager.putClientId(channel,clientIdentifier);
 		Boolean sessionPresent = mqttService.containsSession(clientIdentifier) && !isCleanSession;
 		MqttConnAckMessage okResp = (MqttConnAckMessage) MqttMessageFactory.newMessage(
 				new MqttFixedHeader(MqttMessageType.CONNACK, false, MqttQoS.AT_MOST_ONCE, false, 0),
@@ -143,7 +151,7 @@ public class MqttProcessor {
 	}
 
 	public void processDisConnect(Channel channel, MqttMessage msg) {
-		String clientId = ContextManager.getClientId(channel);
+		String clientId = contextManager.getClientId(channel);
 		SessionStore sessionStore = mqttService.getSession(clientId);
 		if (sessionStore.isCleanSession()) {
 			mqttService.removeSubscribeByClient(clientId);
@@ -158,14 +166,14 @@ public class MqttProcessor {
 	public void processPingReq(Channel channel, MqttMessage msg) {
 		MqttMessage pingRespMessage = MqttMessageFactory.newMessage(
 				new MqttFixedHeader(MqttMessageType.PINGRESP, false, MqttQoS.AT_MOST_ONCE, false, 0), null, null);
-		String clientId = ContextManager.getClientId(channel);
+		String clientId = contextManager.getClientId(channel);
 		log.debug("PINGREQ - clientId: {}", clientId);
 		channel.writeAndFlush(pingRespMessage);
 	}
 
 	public void processPubAck(Channel channel, MqttMessageIdVariableHeader variableHeader) {
 		int messageId = variableHeader.messageId();
-		String clientId = ContextManager.getClientId(channel);
+		String clientId = contextManager.getClientId(channel);
 		log.debug("PUBACK - clientId: {}, messageId: {}", clientId, messageId);
 		mqttService.removeDupPublishMessage(clientId, messageId);
 //		mqttService.releaseMessageId(messageId);
@@ -173,7 +181,7 @@ public class MqttProcessor {
 
 	public void processPubComp(Channel channel, MqttMessageIdVariableHeader variableHeader) {
 		int messageId = variableHeader.messageId();
-		String clientId = ContextManager.getClientId(channel);
+		String clientId = contextManager.getClientId(channel);
 		log.debug("PUBCOMP - clientId: {}, messageId: {}", clientId, messageId);
 		mqttService.removeDupPubRelMessage(clientId, messageId);
 //		mqttService.releaseMessageId(messageId);
@@ -187,20 +195,20 @@ public class MqttProcessor {
 		if (mqttQoS == MqttQoS.AT_MOST_ONCE) {
 			byte[] messageBytes = new byte[payload.readableBytes()];
 			payload.getBytes(payload.readerIndex(), messageBytes);
-//			InternalMessage internalMessage = new InternalMessage().setTopic(topicName)
-//					.setMqttQoS(mqttQoS.value()).setMessageBytes(messageBytes)
-//					.setDup(false).setRetain(false);
-//			internalCommunication.internalSend(internalMessage);
+			InternalMessage internalMessage = new InternalMessage().setTopic(topicName)
+					.setMqttQoS(mqttQoS.value()).setMessageBytes(messageBytes)
+					.setDup(false).setRetain(false);
+			clusterCommunication.internalSend(internalMessage);
 			this.sendPublishMessage(topicName, mqttQoS, messageBytes, false, false);
 		}
 		// QoS=1
 		if (mqttQoS == MqttQoS.AT_LEAST_ONCE) {
 			byte[] messageBytes = new byte[payload.readableBytes()];
 			payload.getBytes(payload.readerIndex(), messageBytes);
-//			InternalMessage internalMessage = new InternalMessage().setTopic(topicName)
-//					.setMqttQoS(mqttQoS.value()).setMessageBytes(messageBytes)
-//					.setDup(false).setRetain(false);
-//			internalCommunication.internalSend(internalMessage);
+			InternalMessage internalMessage = new InternalMessage().setTopic(topicName)
+					.setMqttQoS(mqttQoS.value()).setMessageBytes(messageBytes)
+					.setDup(false).setRetain(false);
+			clusterCommunication.internalSend(internalMessage);
 			this.sendPublishMessage(topicName, mqttQoS, messageBytes, false, false);
 			this.sendPubAckMessage(channel, msg.variableHeader().packetId());
 		}
@@ -208,10 +216,10 @@ public class MqttProcessor {
 		if (mqttQoS == MqttQoS.EXACTLY_ONCE) {
 			byte[] messageBytes = new byte[payload.readableBytes()];
 			payload.getBytes(payload.readerIndex(), messageBytes);
-//			InternalMessage internalMessage = new InternalMessage().setTopic(topicName)
-//					.setMqttQoS(mqttQoS.value()).setMessageBytes(messageBytes)
-//					.setDup(false).setRetain(false);
-//			internalCommunication.internalSend(internalMessage);
+			InternalMessage internalMessage = new InternalMessage().setTopic(topicName)
+					.setMqttQoS(mqttQoS.value()).setMessageBytes(messageBytes)
+					.setDup(false).setRetain(false);
+			clusterCommunication.internalSend(internalMessage);
 			this.sendPublishMessage(topicName, mqttQoS, messageBytes, false, false);
 			this.sendPubRecMessage(channel, msg.variableHeader().packetId());
 		}
@@ -235,7 +243,7 @@ public class MqttProcessor {
 		MqttMessage pubRelMessage = MqttMessageFactory.newMessage(
 				new MqttFixedHeader(MqttMessageType.PUBREL, false, MqttQoS.AT_MOST_ONCE, false, 0),
 				MqttMessageIdVariableHeader.from(messageId), null);
-		String clientId = ContextManager.getClientId(channel);
+		String clientId = contextManager.getClientId(channel);
 		log.debug("PUBREC - clientId: {}, messageId: {}", clientId, messageId);
 		mqttService.removeDupPublishMessage(clientId, variableHeader.messageId());
 		DupPubRelMessageStore dupPubRelMessageStore = new DupPubRelMessageStore().setClientId(clientId)
@@ -249,14 +257,14 @@ public class MqttProcessor {
 		MqttMessage pubCompMessage = MqttMessageFactory.newMessage(
 				new MqttFixedHeader(MqttMessageType.PUBCOMP, false, MqttQoS.AT_MOST_ONCE, false, 0),
 				MqttMessageIdVariableHeader.from(messageId), null);
-		String clientId = ContextManager.getClientId(channel);
+		String clientId = contextManager.getClientId(channel);
 		log.debug("PUBREL - clientId: {}, messageId: {}", clientId, messageId);
 		channel.writeAndFlush(pubCompMessage);
 	}
 
 	public void processSubscribe(Channel channel, MqttSubscribeMessage msg) {
 		List<MqttTopicSubscription> topicSubscriptions = msg.payload().topicSubscriptions();
-		String clientId = ContextManager.getClientId(channel);
+		String clientId = contextManager.getClientId(channel);
 		if(CollectionUtils.isEmpty(topicSubscriptions)){
 			log.info("订阅的topic为空，clientId = {}", clientId);
 			return;
@@ -290,7 +298,7 @@ public class MqttProcessor {
 
 	public void processUnSubscribe(Channel channel, MqttUnsubscribeMessage msg) {
 		List<String> topicFilters = msg.payload().topics();
-		String clientId = ContextManager.getClientId(channel);
+		String clientId = contextManager.getClientId(channel);
 		if(CollectionUtils.isEmpty(topicFilters)){
 			log.warn("取消订阅的topic list为空！ clientId = {}", clientId);
 			return;
@@ -372,7 +380,7 @@ public class MqttProcessor {
 		}
 		retainMessageStores.forEach(retainMessageStore -> {
 			MqttQoS respQoS = retainMessageStore.getMqttQoS() > mqttQoS.value() ? mqttQoS : MqttQoS.valueOf(retainMessageStore.getMqttQoS());
-			String clientId = ContextManager.getClientId(channel);
+			String clientId = contextManager.getClientId(channel);
 			if (respQoS == MqttQoS.AT_MOST_ONCE) {
 				MqttPublishMessage publishMessage = (MqttPublishMessage) MqttMessageFactory.newMessage(
 						new MqttFixedHeader(MqttMessageType.PUBLISH, false, respQoS, false, 0),

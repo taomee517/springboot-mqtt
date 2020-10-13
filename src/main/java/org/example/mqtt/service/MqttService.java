@@ -24,6 +24,9 @@ public class MqttService implements IMqttService {
     @Autowired
     MqttProperties mqttProperties;
 
+    @Autowired
+    ContextManager contextManager;
+
     //MQTT部分
     @Override
     public String parsePayload(byte[] bytes) {
@@ -42,22 +45,22 @@ public class MqttService implements IMqttService {
 
     @Override
     public void putSession(String clientIdentifier, SessionStore session) {
-        ContextManager.putSessionStore(clientIdentifier, session);
+        contextManager.putSessionStore(clientIdentifier, session);
     }
 
     @Override
     public boolean containsSession(String clientIdentifier) {
-        return ContextManager.containsSessionStore(clientIdentifier);
+        return contextManager.containsSessionStore(clientIdentifier);
     }
 
     @Override
     public SessionStore getSession(String clientIdentifier) {
-        return ContextManager.getSessionStore(clientIdentifier);
+        return contextManager.getSessionStore(clientIdentifier);
     }
 
     @Override
     public void removeSession(String clientIdentifier){
-        ContextManager.clearSessionStore(clientIdentifier);
+        contextManager.clearSessionStore(clientIdentifier);
     }
 
 
@@ -65,22 +68,22 @@ public class MqttService implements IMqttService {
 
     @Override
     public void putDupPublishMessage(String clientId, DupPublishMessageStore dupPublishMessageStore) {
-        ContextManager.putDupPublishMessage(clientId,dupPublishMessageStore);
+        contextManager.putDupPublishMessage(clientId,dupPublishMessageStore);
     }
 
     @Override
     public List<DupPublishMessageStore> getDupPublishMessage(String clientIdentifier) {
-        return ContextManager.getDupPublishMessage(clientIdentifier);
+        return contextManager.getDupPublishMessage(clientIdentifier);
     }
 
     @Override
     public void removeDupPublishMessageByClient(String clientIdentifier) {
-        ContextManager.removeDupPublishMessage(clientIdentifier);
+        contextManager.removeDupPublishMessage(clientIdentifier);
     }
 
     @Override
     public void removeDupPublishMessage(String clientIdentifier, int messageId) {
-        ContextManager.removeDupPublishMessage(clientIdentifier, messageId);
+        contextManager.removeDupPublishMessage(clientIdentifier, messageId);
     }
 
 
@@ -90,23 +93,23 @@ public class MqttService implements IMqttService {
 
     @Override
     public void putDupPubRelMessage(String clientId, DupPubRelMessageStore dupPubRelMessageStore) {
-        ContextManager.putDupPubRelMessage(clientId,dupPubRelMessageStore);
+        contextManager.putDupPubRelMessage(clientId,dupPubRelMessageStore);
     }
 
     @Override
     public List<DupPubRelMessageStore> getDupPubRelMessage(String clientIdentifier) {
-        return ContextManager.getDupPubRelMessage(clientIdentifier);
+        return contextManager.getDupPubRelMessage(clientIdentifier);
     }
 
 
     @Override
     public void removeDupPubRelMessageByClient(String clientIdentifier) {
-        ContextManager.removeDupPubRelMessage(clientIdentifier);
+        contextManager.removeDupPubRelMessage(clientIdentifier);
     }
 
     @Override
     public void removeDupPubRelMessage(String clientId, int messageId) {
-        ContextManager.removeDupPubRelMessage(clientId, messageId);
+        contextManager.removeDupPubRelMessage(clientId, messageId);
     }
 
 
@@ -115,22 +118,22 @@ public class MqttService implements IMqttService {
 
     @Override
     public void putSubscribeMessage(String topicFilter, SubscribeStore subscribeStore) {
-        ContextManager.putSubscribeMessage(topicFilter, subscribeStore);
+        contextManager.putSubscribeMessage(topicFilter, subscribeStore);
     }
 
     @Override
     public void removeSubscribeMessage(String topicFilter, String clientId) {
-        ContextManager.removeSubscribeMessage(topicFilter, clientId);
+        contextManager.removeSubscribeMessage(topicFilter, clientId);
     }
 
     @Override
     public void removeSubscribeByClient(String clientIdentifier) {
-        ContextManager.removeSubscribeMessage(clientIdentifier);
+        contextManager.removeSubscribeMessage(clientIdentifier);
     }
 
     @Override
     public List<SubscribeStore> searchSubscribe(String topic) {
-        return ContextManager.searchSubscribeMessage(topic);
+        return contextManager.searchSubscribeMessage(topic);
     }
 
 
@@ -139,17 +142,17 @@ public class MqttService implements IMqttService {
 
     @Override
     public void putRetainMessage(String topicName, RetainMessageStore retainMessageStore) {
-        ContextManager.putRetainMessage(topicName, retainMessageStore);
+        contextManager.putRetainMessage(topicName, retainMessageStore);
     }
 
     @Override
     public List<RetainMessageStore> searchRetainMessage(String topicFilter) {
-        return ContextManager.searchRetainMessage(topicFilter);
+        return contextManager.searchRetainMessage(topicFilter);
     }
 
     @Override
     public void removeRetainMessage(String topicName) {
-        ContextManager.removeRetainMessage(topicName);
+        contextManager.removeRetainMessage(topicName);
     }
 
     @Override

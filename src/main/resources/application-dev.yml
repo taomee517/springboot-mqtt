@@ -9,7 +9,7 @@ spring:
     config:
       username: admin						# 账号
       password: public						# 密码
-      auth-check-enable: false
+      auth-check-enable: true
       tcp-port: 51100
       ssl-port: 51101
       ws-port: 51102
@@ -19,4 +19,29 @@ spring:
       ssl-enable: true
       server-key-path: keystore/mqtt-broker.pfx
 #      root-key-path: keystore/root.jks
-      default-internal-topic: $internal$
+
+
+  ignite:
+    config:
+      # broker唯一标识
+      broker-id: mqtt-broker-1
+      # 持久化磁盘存储路径
+      persistence-store-path: D:/ignite/data
+      # 持久化缓存内存初始化大小(MB)
+      persistence-initial-size: 64
+      # 持久化缓存占用内存最大值(MB)
+      persistence-max-size: 128
+      # 非持久化缓存内存初始化大小(MB)
+      not-persistence-initial-size: 64
+      # 非持久化缓存占用内存最大值(MB)
+      not-persistence-max-size: 128
+      #集群数据同步主题
+      cluster-internal-topic: $cluster$internal$
+      # 开启组播方式集群
+      enable-multicast-group: true
+      # 组播地址
+      multicast-group: 239.255.255.255
+      # 静态ip方式组建集群
+      static-ip-addresses:
+        - 127.0.0.1
+        - 192.168.1.45

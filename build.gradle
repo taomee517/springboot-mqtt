@@ -78,6 +78,9 @@ dependencies {
     // netty-all
     compile group: 'io.netty', name: 'netty-all', version:'4.1.48.Final'
 
+    // ignite
+    compile group: 'org.apache.ignite', name: 'ignite-core', version:'2.6.0'
+
     // common-lang3
     compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.9'
 

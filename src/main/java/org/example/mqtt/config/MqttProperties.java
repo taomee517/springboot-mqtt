@@ -38,5 +38,4 @@ public class MqttProperties {
      */
     private String sslPassword;
     private Boolean sslEnable;
-    private String defaultInternalTopic;
 }

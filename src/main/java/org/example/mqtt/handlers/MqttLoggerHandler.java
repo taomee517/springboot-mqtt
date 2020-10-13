@@ -39,10 +39,13 @@ public class MqttLoggerHandler extends ChannelOutboundHandlerAdapter{
     @Autowired
     IMqttService mqttService;
 
+    @Autowired
+    ContextManager contextManager;
+
 	@Override
 	public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
         try {
-            String clientId = ContextManager.getClientId(ctx.channel());
+            String clientId = contextManager.getClientId(ctx.channel());
             if(StringUtils.isNotEmpty(clientId)) {
                 if (msg instanceof MqttMessage) {
                     MqttMessage mqttMessage = (MqttMessage) msg;
