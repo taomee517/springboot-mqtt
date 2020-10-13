@@ -19,7 +19,6 @@ group = "org.example"
 version = "1.0"
 archivesBaseName = 'springboot-mqtt'
 def parentVersion = '1.0'
-mainClassName = 'com.bchd.iot.acceptor.BchdAcceptorApplication'
 
 configurations.all {
     resolutionStrategy() {
@@ -41,21 +40,6 @@ repositories {
     mavenLocal()
     maven {
         url 'https://maven.aliyun.com/repository/public'
-    }
-    maven {
-        credentials {
-            username '5f02b6c7cc3021d7e3a18a83'
-            password ']yiTy7fm]4A('
-        }
-        url 'https://packages.aliyun.com/maven/repository/2013092-release-7h4CWP/'
-    }
-
-    maven {
-        credentials {
-            username '5f02b6c7cc3021d7e3a18a83'
-            password ']yiTy7fm]4A('
-        }
-        url 'https://packages.aliyun.com/maven/repository/2013092-snapshot-YGIfCF/'
     }
     mavenCentral()
 }
