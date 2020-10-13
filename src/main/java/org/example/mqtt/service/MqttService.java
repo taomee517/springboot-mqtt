@@ -31,26 +31,10 @@ public class MqttService implements IMqttService {
     }
 
     @Override
-    public boolean checkValid(String user, String pwd) {
-        Boolean authCheckEnable = mqttProperties.getAuthCheckEnable();
-        if (!authCheckEnable){
-            return true;
-        }
-        String authUser = mqttProperties.getUsername();
-        String authPwd = mqttProperties.getPassword();
-        return StringUtils.equalsIgnoreCase(user, authUser) && StringUtils.equalsIgnoreCase(pwd, authPwd);
-    }
-
-    @Override
     public boolean topicValidate(String topicFilter) {
 //        if(!topicFilter.startsWith("$")){
 //            return false;
 //        }
-        return true;
-    }
-
-    @Override
-    public boolean needSecondParse() {
         return true;
     }
 

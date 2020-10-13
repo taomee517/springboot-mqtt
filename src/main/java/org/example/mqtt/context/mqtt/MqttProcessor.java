@@ -13,6 +13,7 @@ import io.netty.util.CharsetUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.example.mqtt.context.ContextManager;
+import org.example.mqtt.service.IAuthService;
 import org.example.mqtt.service.IMqttService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -29,7 +30,10 @@ import java.util.List;
 public class MqttProcessor {
 
 	@Autowired
-	private IMqttService mqttProtocol;
+	IMqttService mqttService;
+
+	@Autowired
+	IAuthService authService;
 
 	public void processConnect(Channel channel, MqttConnectMessage msg) {
 		// 消息解码器出现异常
@@ -67,7 +71,7 @@ public class MqttProcessor {
 		// 用户名和密码验证, 这里要求客户端连接时必须提供用户名和密码, 不管是否设置用户名标志和密码标志为1, 此处没有参考标准协议实现
 		String username = msg.payload().userName();
 		String password = msg.payload().passwordInBytes() == null ? null : new String(msg.payload().passwordInBytes(), CharsetUtil.UTF_8);
-		if (!mqttProtocol.checkValid(username, password)) {
+		if (!authService.checkValid(username, password)) {
 			MqttConnAckMessage connAckMessage = (MqttConnAckMessage) MqttMessageFactory.newMessage(
 					new MqttFixedHeader(MqttMessageType.CONNACK, false, MqttQoS.AT_MOST_ONCE, false, 0),
 					new MqttConnAckVariableHeader(MqttConnectReturnCode.CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD, false), null);
@@ -77,15 +81,15 @@ public class MqttProcessor {
 		}
 		// 如果会话中已存储这个新连接的clientId, 就关闭之前该clientId的连接
 		String clientIdentifier = msg.payload().clientIdentifier();
-		if (mqttProtocol.containsSession(clientIdentifier)) {
-			SessionStore session = mqttProtocol.getSession(clientIdentifier);
+		if (mqttService.containsSession(clientIdentifier)) {
+			SessionStore session = mqttService.getSession(clientIdentifier);
 			Channel previous = session.getChannel();
 			Boolean cleanSession = session.isCleanSession();
 			if (cleanSession) {
-				mqttProtocol.removeSession(clientIdentifier);
-				mqttProtocol.removeSubscribeByClient(clientIdentifier);
-				mqttProtocol.removeDupPublishMessageByClient(clientIdentifier);
-				mqttProtocol.removeDupPubRelMessageByClient(clientIdentifier);
+				mqttService.removeSession(clientIdentifier);
+				mqttService.removeSubscribeByClient(clientIdentifier);
+				mqttService.removeDupPublishMessageByClient(clientIdentifier);
+				mqttService.removeDupPubRelMessageByClient(clientIdentifier);
 			}
 			previous.close();
 		}
@@ -106,10 +110,10 @@ public class MqttProcessor {
 			channel.pipeline().addFirst("idle", new IdleStateHandler(0, 0, Math.round(msg.variableHeader().keepAliveTimeSeconds() * 1.5f)));
 		}
 		// 至此存储会话信息及返回接受客户端连接
-		mqttProtocol.putSession(clientIdentifier, sessionStore);
+		mqttService.putSession(clientIdentifier, sessionStore);
 		// 将clientId存储到channel的map中
 		ContextManager.putClientId(channel,clientIdentifier);
-		Boolean sessionPresent = mqttProtocol.containsSession(clientIdentifier) && !isCleanSession;
+		Boolean sessionPresent = mqttService.containsSession(clientIdentifier) && !isCleanSession;
 		MqttConnAckMessage okResp = (MqttConnAckMessage) MqttMessageFactory.newMessage(
 				new MqttFixedHeader(MqttMessageType.CONNACK, false, MqttQoS.AT_MOST_ONCE, false, 0),
 				new MqttConnAckVariableHeader(MqttConnectReturnCode.CONNECTION_ACCEPTED, sessionPresent), null);
@@ -117,8 +121,8 @@ public class MqttProcessor {
 		log.debug("CONNECT - clientId: {}, cleanSession: {}", clientIdentifier, isCleanSession);
 		// 如果cleanSession为0, 需要重发同一clientId存储的未完成的QoS1和QoS2的DUP消息
 		if (!isCleanSession) {
-			List<DupPublishMessageStore> dupPublishMessageStoreList = mqttProtocol.getDupPublishMessage(clientIdentifier);
-			List<DupPubRelMessageStore> dupPubRelMessageStoreList = mqttProtocol.getDupPubRelMessage(clientIdentifier);
+			List<DupPublishMessageStore> dupPublishMessageStoreList = mqttService.getDupPublishMessage(clientIdentifier);
+			List<DupPubRelMessageStore> dupPubRelMessageStoreList = mqttService.getDupPubRelMessage(clientIdentifier);
 			if (!CollectionUtils.isEmpty(dupPublishMessageStoreList)) {
 				dupPublishMessageStoreList.forEach(dupPublishMessageStore -> {
 					MqttPublishMessage publishMessage = (MqttPublishMessage) MqttMessageFactory.newMessage(
@@ -140,14 +144,14 @@ public class MqttProcessor {
 
 	public void processDisConnect(Channel channel, MqttMessage msg) {
 		String clientId = ContextManager.getClientId(channel);
-		SessionStore sessionStore = mqttProtocol.getSession(clientId);
+		SessionStore sessionStore = mqttService.getSession(clientId);
 		if (sessionStore.isCleanSession()) {
-			mqttProtocol.removeSubscribeByClient(clientId);
-			mqttProtocol.removeDupPublishMessageByClient(clientId);
-			mqttProtocol.removeDupPubRelMessageByClient(clientId);
+			mqttService.removeSubscribeByClient(clientId);
+			mqttService.removeDupPublishMessageByClient(clientId);
+			mqttService.removeDupPubRelMessageByClient(clientId);
 		}
 		log.debug("DISCONNECT - clientId: {}, cleanSession: {}", clientId, sessionStore.isCleanSession());
-		mqttProtocol.removeSession(clientId);
+		mqttService.removeSession(clientId);
 		channel.close();
 	}
 
@@ -163,16 +167,16 @@ public class MqttProcessor {
 		int messageId = variableHeader.messageId();
 		String clientId = ContextManager.getClientId(channel);
 		log.debug("PUBACK - clientId: {}, messageId: {}", clientId, messageId);
-		mqttProtocol.removeDupPublishMessage(clientId, messageId);
-//		mqttProtocol.releaseMessageId(messageId);
+		mqttService.removeDupPublishMessage(clientId, messageId);
+//		mqttService.releaseMessageId(messageId);
 	}
 
 	public void processPubComp(Channel channel, MqttMessageIdVariableHeader variableHeader) {
 		int messageId = variableHeader.messageId();
 		String clientId = ContextManager.getClientId(channel);
 		log.debug("PUBCOMP - clientId: {}, messageId: {}", clientId, messageId);
-		mqttProtocol.removeDupPubRelMessage(clientId, messageId);
-//		mqttProtocol.releaseMessageId(messageId);
+		mqttService.removeDupPubRelMessage(clientId, messageId);
+//		mqttService.releaseMessageId(messageId);
 	}
 
 	public void processPublish(Channel channel, MqttPublishMessage msg) {
@@ -216,11 +220,11 @@ public class MqttProcessor {
 			byte[] messageBytes = new byte[payload.readableBytes()];
 			payload.getBytes(payload.readerIndex(), messageBytes);
 			if (messageBytes.length == 0) {
-				mqttProtocol.removeRetainMessage(topicName);
+				mqttService.removeRetainMessage(topicName);
 			} else {
 				RetainMessageStore retainMessageStore = new RetainMessageStore().setTopic(topicName).setMqttQoS(mqttQoS.value())
 						.setMessageBytes(messageBytes);
-				mqttProtocol.putRetainMessage(msg.variableHeader().topicName(), retainMessageStore);
+				mqttService.putRetainMessage(msg.variableHeader().topicName(), retainMessageStore);
 			}
 		}
 	}
@@ -233,10 +237,10 @@ public class MqttProcessor {
 				MqttMessageIdVariableHeader.from(messageId), null);
 		String clientId = ContextManager.getClientId(channel);
 		log.debug("PUBREC - clientId: {}, messageId: {}", clientId, messageId);
-		mqttProtocol.removeDupPublishMessage(clientId, variableHeader.messageId());
+		mqttService.removeDupPublishMessage(clientId, variableHeader.messageId());
 		DupPubRelMessageStore dupPubRelMessageStore = new DupPubRelMessageStore().setClientId(clientId)
 				.setMessageId(messageId);
-		mqttProtocol.putDupPubRelMessage(clientId, dupPubRelMessageStore);
+		mqttService.putDupPubRelMessage(clientId, dupPubRelMessageStore);
 		channel.writeAndFlush(pubRelMessage);
 	}
 
@@ -263,7 +267,7 @@ public class MqttProcessor {
 				String topicFilter = topicSubscription.topicName();
 				MqttQoS mqttQoS = topicSubscription.qualityOfService();
 				SubscribeStore subscribeStore = new SubscribeStore(clientId, topicFilter, mqttQoS.value());
-				mqttProtocol.putSubscribeMessage(topicFilter, subscribeStore);
+				mqttService.putSubscribeMessage(topicFilter, subscribeStore);
 				mqttQoSList.add(mqttQoS.value());
 				log.debug("SUBSCRIBE - clientId: {}, topFilter: {}, QoS: {}", clientId, topicFilter, mqttQoS.value());
 			});
@@ -292,7 +296,7 @@ public class MqttProcessor {
 			return;
 		}
 		topicFilters.forEach(topicFilter -> {
-			mqttProtocol.removeSubscribeMessage(topicFilter, clientId);
+			mqttService.removeSubscribeMessage(topicFilter, clientId);
 			log.debug("UNSUBSCRIBE - clientId: {}, topicFilter: {}", clientId, topicFilter);
 		});
 		MqttUnsubAckMessage unsubAckMessage = (MqttUnsubAckMessage) MqttMessageFactory.newMessage(
@@ -303,14 +307,14 @@ public class MqttProcessor {
 
 
 	private void sendPublishMessage(String topic, MqttQoS mqttQoS, byte[] messageBytes, boolean retain, boolean dup) {
-		List<SubscribeStore> subscribeStores = mqttProtocol.searchSubscribe(topic);
+		List<SubscribeStore> subscribeStores = mqttService.searchSubscribe(topic);
 		if(CollectionUtils.isEmpty(subscribeStores)){
 			log.info("topic: {} 的订阅者为空", topic);
 			return;
 		}
 		subscribeStores.forEach(subscribeStore -> {
 			String clientId = subscribeStore.getClientId();
-			if (mqttProtocol.containsSession(clientId)) {
+			if (mqttService.containsSession(clientId)) {
 				// 订阅者收到MQTT消息的QoS级别, 最终取决于发布消息的QoS和主题订阅的QoS
 				MqttQoS respQoS = mqttQoS.value() > subscribeStore.getMqttQoS() ? MqttQoS.valueOf(subscribeStore.getMqttQoS()) : mqttQoS;
 				if (respQoS == MqttQoS.AT_MOST_ONCE) {
@@ -318,29 +322,29 @@ public class MqttProcessor {
 							new MqttFixedHeader(MqttMessageType.PUBLISH, dup, respQoS, retain, 0),
 							new MqttPublishVariableHeader(topic, 0), Unpooled.buffer().writeBytes(messageBytes));
 					log.debug("PUBLISH - clientId: {}, topic: {}, Qos: {}", clientId, topic, respQoS.value());
-					mqttProtocol.getSession(clientId).getChannel().writeAndFlush(publishMessage);
+					mqttService.getSession(clientId).getChannel().writeAndFlush(publishMessage);
 				}
 				if (respQoS == MqttQoS.AT_LEAST_ONCE) {
-					int messageId = mqttProtocol.getNextMessageId(clientId);
+					int messageId = mqttService.getNextMessageId(clientId);
 					MqttPublishMessage publishMessage = (MqttPublishMessage) MqttMessageFactory.newMessage(
 							new MqttFixedHeader(MqttMessageType.PUBLISH, dup, respQoS, retain, 0),
 							new MqttPublishVariableHeader(topic, messageId), Unpooled.buffer().writeBytes(messageBytes));
 					log.debug("PUBLISH - clientId: {}, topic: {}, Qos: {}, messageId: {}", clientId, topic, respQoS.value(), messageId);
 					DupPublishMessageStore dupPublishMessageStore = new DupPublishMessageStore().setClientId(clientId)
 							.setTopic(topic).setMqttQoS(respQoS.value()).setMessageBytes(messageBytes);
-					mqttProtocol.putDupPublishMessage(clientId, dupPublishMessageStore);
-					mqttProtocol.getSession(clientId).getChannel().writeAndFlush(publishMessage);
+					mqttService.putDupPublishMessage(clientId, dupPublishMessageStore);
+					mqttService.getSession(clientId).getChannel().writeAndFlush(publishMessage);
 				}
 				if (respQoS == MqttQoS.EXACTLY_ONCE) {
-					int messageId = mqttProtocol.getNextMessageId(clientId);
+					int messageId = mqttService.getNextMessageId(clientId);
 					MqttPublishMessage publishMessage = (MqttPublishMessage) MqttMessageFactory.newMessage(
 							new MqttFixedHeader(MqttMessageType.PUBLISH, dup, respQoS, retain, 0),
 							new MqttPublishVariableHeader(topic, messageId), Unpooled.buffer().writeBytes(messageBytes));
 					log.debug("PUBLISH - clientId: {}, topic: {}, Qos: {}, messageId: {}", clientId, topic, respQoS.value(), messageId);
 					DupPublishMessageStore dupPublishMessageStore = new DupPublishMessageStore().setClientId(clientId)
 							.setTopic(topic).setMqttQoS(respQoS.value()).setMessageBytes(messageBytes);
-					mqttProtocol.putDupPublishMessage(clientId, dupPublishMessageStore);
-					mqttProtocol.getSession(clientId).getChannel().writeAndFlush(publishMessage);
+					mqttService.putDupPublishMessage(clientId, dupPublishMessageStore);
+					mqttService.getSession(clientId).getChannel().writeAndFlush(publishMessage);
 				}
 			}
 		});
@@ -362,7 +366,7 @@ public class MqttProcessor {
 
 
 	private void sendRetainMessage(Channel channel, String topicFilter, MqttQoS mqttQoS) {
-		List<RetainMessageStore> retainMessageStores = mqttProtocol.searchRetainMessage(topicFilter);
+		List<RetainMessageStore> retainMessageStores = mqttService.searchRetainMessage(topicFilter);
 		if(CollectionUtils.isEmpty(retainMessageStores)){
 			return;
 		}
@@ -377,7 +381,7 @@ public class MqttProcessor {
 				channel.writeAndFlush(publishMessage);
 			}
 			if (respQoS == MqttQoS.AT_LEAST_ONCE) {
-				int messageId = mqttProtocol.getNextMessageId(clientId);
+				int messageId = mqttService.getNextMessageId(clientId);
 				MqttPublishMessage publishMessage = (MqttPublishMessage) MqttMessageFactory.newMessage(
 						new MqttFixedHeader(MqttMessageType.PUBLISH, false, respQoS, false, 0),
 						new MqttPublishVariableHeader(retainMessageStore.getTopic(), messageId), Unpooled.buffer().writeBytes(retainMessageStore.getMessageBytes()));
@@ -385,7 +389,7 @@ public class MqttProcessor {
 				channel.writeAndFlush(publishMessage);
 			}
 			if (respQoS == MqttQoS.EXACTLY_ONCE) {
-				int messageId = mqttProtocol.getNextMessageId(clientId);
+				int messageId = mqttService.getNextMessageId(clientId);
 				MqttPublishMessage publishMessage = (MqttPublishMessage) MqttMessageFactory.newMessage(
 						new MqttFixedHeader(MqttMessageType.PUBLISH, false, respQoS, false, 0),
 						new MqttPublishVariableHeader(retainMessageStore.getTopic(), messageId), Unpooled.buffer().writeBytes(retainMessageStore.getMessageBytes()));
@@ -399,7 +403,7 @@ public class MqttProcessor {
 	private boolean validTopicFilter(List<MqttTopicSubscription> topicSubscriptions) {
 		for (MqttTopicSubscription topicSubscription : topicSubscriptions) {
 			String topicFilter = topicSubscription.topicName();
-			boolean b = mqttProtocol.topicValidate(topicFilter);
+			boolean b = mqttService.topicValidate(topicFilter);
 			if(b){
 				continue;
 			}

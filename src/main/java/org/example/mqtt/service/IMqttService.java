@@ -14,11 +14,7 @@ public interface IMqttService {
 
     String parsePayload(byte[] bytes);
 
-    boolean checkValid(String user, String pwd);
-
     boolean topicValidate(String topicFilter);
-
-    boolean needSecondParse();
 
 
     //session
