@@ -18,6 +18,5 @@ public class SpringbootMqttApplication {
         log.info("本机ip:{}", localIp);
         System.setProperty("local-ip", localIp);
         SpringApplication.run(SpringbootMqttApplication.class);
-        log.info("Start DONE.");
     }
 }

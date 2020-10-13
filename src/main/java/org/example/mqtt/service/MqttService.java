@@ -2,9 +2,11 @@ package org.example.mqtt.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.example.mqtt.config.MqttProperties;
 import org.example.mqtt.context.ContextManager;
 import org.example.mqtt.context.mqtt.*;
 import org.example.mqtt.utils.SnUtil;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -18,8 +20,11 @@ import java.util.List;
 @Slf4j
 @Component
 public class MqttService implements IMqttService {
-    //MQTT部分
 
+    @Autowired
+    MqttProperties mqttProperties;
+
+    //MQTT部分
     @Override
     public String parsePayload(byte[] bytes) {
         return new String(bytes);
@@ -27,7 +32,7 @@ public class MqttService implements IMqttService {
 
     @Override
     public boolean checkValid(String user, String pwd) {
-        if(StringUtils.equalsIgnoreCase(user, "admin") && StringUtils.equalsIgnoreCase(pwd, "123456")){
+        if(StringUtils.equalsIgnoreCase(user, mqttProperties.getUsername()) && StringUtils.equalsIgnoreCase(pwd, mqttProperties.getPassword())){
             return true;
         }
         return false;
@@ -35,9 +40,9 @@ public class MqttService implements IMqttService {
 
     @Override
     public boolean topicValidate(String topicFilter) {
-        if(!topicFilter.startsWith("$")){
-            return false;
-        }
+//        if(!topicFilter.startsWith("$")){
+//            return false;
+//        }
         return true;
     }
 

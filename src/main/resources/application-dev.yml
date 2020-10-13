@@ -4,3 +4,16 @@ spring:
     port: 6379
   kafka:
     bootstrap-servers: 127.0.0.1:9092
+
+  mqtt:
+    config:
+      username: admin						# 账号
+      password: public						# 密码
+      tcp-port: 51100
+      ssl-port: 51101
+      ws-port: 51102
+      wss-port: 51103
+      websocket-path: /mqtt
+      ssl-password: 123456
+      ssl-enable: true
+      default-internal-topic: $internal$
