@@ -1,11 +1,10 @@
-package org.example.mqtt.service;
+package org.example.mqtt.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.example.mqtt.config.MqttProperties;
 import org.example.mqtt.context.ContextManager;
 import org.example.mqtt.context.mqtt.*;
-import org.example.mqtt.utils.SnUtil;
+import org.example.mqtt.service.IMqttService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -153,10 +152,5 @@ public class MqttService implements IMqttService {
     @Override
     public void removeRetainMessage(String topicName) {
         contextManager.removeRetainMessage(topicName);
-    }
-
-    @Override
-    public int getNextMessageId(String clientIdentifier) {
-        return SnUtil.getSn(clientIdentifier);
     }
 }

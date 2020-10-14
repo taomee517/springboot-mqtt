@@ -1,7 +1,8 @@
-package org.example.mqtt.service;
+package org.example.mqtt.service.impl;
 
 import org.apache.commons.lang3.StringUtils;
 import org.example.mqtt.config.MqttProperties;
+import org.example.mqtt.service.IAuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

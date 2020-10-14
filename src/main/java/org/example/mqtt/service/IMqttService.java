@@ -68,7 +68,4 @@ public interface IMqttService {
 
     void removeRetainMessage(String topicName);
 
-
-
-    int getNextMessageId(String clientId);
 }

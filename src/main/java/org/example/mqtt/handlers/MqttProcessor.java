@@ -18,6 +18,7 @@ import org.example.mqtt.ignite.ClusterCommunication;
 import org.example.mqtt.ignite.InternalMessage;
 import org.example.mqtt.service.IAuthService;
 import org.example.mqtt.service.IMqttService;
+import org.example.mqtt.service.IMsgIdService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
@@ -39,6 +40,9 @@ public class MqttProcessor {
 
 	@Autowired
 	IAuthService authService;
+
+	@Autowired
+	IMsgIdService msgIdService;
 
 	@Autowired
 	ClusterCommunication clusterCommunication;
@@ -176,7 +180,7 @@ public class MqttProcessor {
 		String clientId = contextManager.getClientId(channel);
 		log.debug("PUBACK - clientId: {}, messageId: {}", clientId, messageId);
 		mqttService.removeDupPublishMessage(clientId, messageId);
-//		mqttService.releaseMessageId(messageId);
+		msgIdService.releaseMessageId(messageId);
 	}
 
 	public void processPubComp(Channel channel, MqttMessageIdVariableHeader variableHeader) {
@@ -184,7 +188,7 @@ public class MqttProcessor {
 		String clientId = contextManager.getClientId(channel);
 		log.debug("PUBCOMP - clientId: {}, messageId: {}", clientId, messageId);
 		mqttService.removeDupPubRelMessage(clientId, messageId);
-//		mqttService.releaseMessageId(messageId);
+		msgIdService.releaseMessageId(messageId);
 	}
 
 	public void processPublish(Channel channel, MqttPublishMessage msg) {
@@ -333,7 +337,7 @@ public class MqttProcessor {
 					mqttService.getSession(clientId).getChannel().writeAndFlush(publishMessage);
 				}
 				if (respQoS == MqttQoS.AT_LEAST_ONCE) {
-					int messageId = mqttService.getNextMessageId(clientId);
+					int messageId = msgIdService.getNextMessageId();
 					MqttPublishMessage publishMessage = (MqttPublishMessage) MqttMessageFactory.newMessage(
 							new MqttFixedHeader(MqttMessageType.PUBLISH, dup, respQoS, retain, 0),
 							new MqttPublishVariableHeader(topic, messageId), Unpooled.buffer().writeBytes(messageBytes));
@@ -344,7 +348,7 @@ public class MqttProcessor {
 					mqttService.getSession(clientId).getChannel().writeAndFlush(publishMessage);
 				}
 				if (respQoS == MqttQoS.EXACTLY_ONCE) {
-					int messageId = mqttService.getNextMessageId(clientId);
+					int messageId = msgIdService.getNextMessageId();
 					MqttPublishMessage publishMessage = (MqttPublishMessage) MqttMessageFactory.newMessage(
 							new MqttFixedHeader(MqttMessageType.PUBLISH, dup, respQoS, retain, 0),
 							new MqttPublishVariableHeader(topic, messageId), Unpooled.buffer().writeBytes(messageBytes));
@@ -389,7 +393,7 @@ public class MqttProcessor {
 				channel.writeAndFlush(publishMessage);
 			}
 			if (respQoS == MqttQoS.AT_LEAST_ONCE) {
-				int messageId = mqttService.getNextMessageId(clientId);
+				int messageId = msgIdService.getNextMessageId();
 				MqttPublishMessage publishMessage = (MqttPublishMessage) MqttMessageFactory.newMessage(
 						new MqttFixedHeader(MqttMessageType.PUBLISH, false, respQoS, false, 0),
 						new MqttPublishVariableHeader(retainMessageStore.getTopic(), messageId), Unpooled.buffer().writeBytes(retainMessageStore.getMessageBytes()));
@@ -397,7 +401,7 @@ public class MqttProcessor {
 				channel.writeAndFlush(publishMessage);
 			}
 			if (respQoS == MqttQoS.EXACTLY_ONCE) {
-				int messageId = mqttService.getNextMessageId(clientId);
+				int messageId = msgIdService.getNextMessageId();
 				MqttPublishMessage publishMessage = (MqttPublishMessage) MqttMessageFactory.newMessage(
 						new MqttFixedHeader(MqttMessageType.PUBLISH, false, respQoS, false, 0),
 						new MqttPublishVariableHeader(retainMessageStore.getTopic(), messageId), Unpooled.buffer().writeBytes(retainMessageStore.getMessageBytes()));

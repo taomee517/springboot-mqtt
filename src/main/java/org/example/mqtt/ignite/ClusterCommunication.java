@@ -11,6 +11,7 @@ import org.apache.ignite.IgniteMessaging;
 import org.example.mqtt.config.IgniteProperties;
 import org.example.mqtt.context.mqtt.SubscribeStore;
 import org.example.mqtt.service.IMqttService;
+import org.example.mqtt.service.IMsgIdService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -30,7 +31,10 @@ public class ClusterCommunication {
 
 	@Autowired
 	IMqttService mqttService;
-	
+
+	@Autowired
+	IMsgIdService msgIdService;
+
 	@Autowired
 	IgniteProperties igniteProperties;
 
@@ -64,7 +68,7 @@ public class ClusterCommunication {
 					mqttService.getSession(clientId).getChannel().writeAndFlush(publishMessage);
 				}
 				if (respQoS == MqttQoS.AT_LEAST_ONCE) {
-					int messageId = mqttService.getNextMessageId(clientId);
+					int messageId = msgIdService.getNextMessageId();
 					MqttPublishMessage publishMessage = (MqttPublishMessage) MqttMessageFactory.newMessage(
 						new MqttFixedHeader(MqttMessageType.PUBLISH, dup, respQoS, retain, 0),
 						new MqttPublishVariableHeader(topic, messageId), Unpooled.buffer().writeBytes(messageBytes));
@@ -72,7 +76,7 @@ public class ClusterCommunication {
 					mqttService.getSession(clientId).getChannel().writeAndFlush(publishMessage);
 				}
 				if (respQoS == MqttQoS.EXACTLY_ONCE) {
-					int messageId = mqttService.getNextMessageId(clientId);
+					int messageId = msgIdService.getNextMessageId();
 					MqttPublishMessage publishMessage = (MqttPublishMessage) MqttMessageFactory.newMessage(
 						new MqttFixedHeader(MqttMessageType.PUBLISH, dup, respQoS, retain, 0),
 						new MqttPublishVariableHeader(topic, messageId), Unpooled.buffer().writeBytes(messageBytes));
