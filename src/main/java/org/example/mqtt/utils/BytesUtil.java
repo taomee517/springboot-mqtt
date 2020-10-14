@@ -139,4 +139,11 @@ public class BytesUtil {
 //        testImei = StringUtils.removeStart(testImei,"0");
 //        System.out.println(testImei);
 //    }
+
+//    public static void main(String[] args) {
+//        String hex = "04 00 52 32 34 30 33 30 35 30 30 34 30 37 37 38 39 33 00 b4 00 3c 0a 22 69 46 00 00 00 00 01 4d 44 36 34 39 56 5f 4d 43 20 33 2e 31 2e 32 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 c9 66 38 31 76 d7 fb 02 82 b2 2c 63 2a bc 5b 77 e9 04 11";
+//        byte[] bytes = hex2Bytes(hex);
+//        String ascii = new String(bytes);
+//        System.out.println(ascii);
+//    }
 }

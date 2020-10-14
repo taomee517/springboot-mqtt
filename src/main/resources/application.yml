@@ -3,7 +3,7 @@ spring:
     active: dev
 
 server:
-  port: 9633
+  port: 9733
 
 acceptor:
   kafka:

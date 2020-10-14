@@ -10,13 +10,13 @@ spring:
       username: admin						# 账号
       password: public						# 密码
       auth-check-enable: true
-      tcp-port: 51100
-      ssl-port: 51101
-      ws-port: 51102
-      wss-port: 51103
+      tcp-port: 55100
+      ssl-port: 55101
+      ws-port: 55102
+      wss-port: 55103
       websocket-path: /mqtt
       ssl-password: 123456
-      ssl-enable: true
+      ssl-enable: false
       server-key-path: keystore/mqtt-broker.pfx
 #      root-key-path: keystore/root.jks
 
